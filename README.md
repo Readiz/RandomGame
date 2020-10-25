@@ -1,3 +1,7 @@
+# Random Game
+
+Simple Game to determine who is win or lose.
+
 Svelte now officially suports Typescript: https://svelte.dev/blog/svelte-and-typescript This repo is therefore archived
 
 # Svelte + Typescript + Rollup

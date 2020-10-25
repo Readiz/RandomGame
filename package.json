@@ -1,0 +1,32 @@
+{
+  "name": "random-game",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "rimraf ./dist && cross-env NODE_ENV=development rollup --config --watch",
+    "serve": "rimraf ./dist && cross-env NODE_ENV=development rollup --config --watch",
+    "build": "rimraf ./dist && cross-env NODE_ENV=production rollup --config"
+  },
+  "dependencies": {
+    "bootstrap": "^4.5.3",
+    "svelte": "^3.20.1"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^11.0.2",
+    "@rollup/plugin-node-resolve": "^7.1.1",
+    "cross-env": "^7.0.2",
+    "node-sass": "^4.14.1",
+    "rimraf": "^3.0.2",
+    "rollup": "^2.3.4",
+    "rollup-plugin-html2": "^1.1.0",
+    "rollup-plugin-livereload": "^1.1.0",
+    "rollup-plugin-postcss": "^2.5.0",
+    "rollup-plugin-scss": "^2.1.0",
+    "rollup-plugin-serve": "^1.0.1",
+    "rollup-plugin-static-files": "^0.1.0",
+    "rollup-plugin-svelte": "^5.2.1",
+    "rollup-plugin-terser": "^5.3.0",
+    "svelte-preprocess": "^3.7.1"
+  }
+}

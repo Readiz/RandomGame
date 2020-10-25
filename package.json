@@ -4,9 +4,9 @@
   "main": "src/index.js",
   "license": "MIT",
   "scripts": {
-    "start": "rimraf ./dist && cross-env NODE_ENV=development rollup --config --watch",
-    "serve": "rimraf ./dist && cross-env NODE_ENV=development rollup --config --watch",
-    "build": "rimraf ./dist && cross-env NODE_ENV=production rollup --config"
+    "start": "rimraf ./docs && cross-env NODE_ENV=development rollup --config --watch",
+    "serve": "rimraf ./docs && cross-env NODE_ENV=development rollup --config --watch",
+    "build": "rimraf ./docs && cross-env NODE_ENV=production rollup --config"
   },
   "dependencies": {
     "bootstrap": "^4.5.3",

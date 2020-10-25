@@ -33,7 +33,7 @@ const plugins = [
 if (isDevelopment) {
   plugins.push(
     serve({
-      contentBase: "./dist",
+      contentBase: "./docs",
       open: false,
       host: '0.0.0.0',
       port: 1523 // WSL: 1522 (SSH) ~ 1528 is opened for test.
@@ -47,7 +47,7 @@ if (isDevelopment) {
 module.exports = {
   input: "src/index.js",
   output: {
-    file: "dist/index.js",
+    file: "docs/index.js",
     sourcemap: true,
     format: "iife",
   },

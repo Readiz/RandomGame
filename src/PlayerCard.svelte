@@ -96,8 +96,8 @@
             }
         }
 
-        // 태성 전용: 2% 확률로 최대 강화 도달
-        if (playerInfo.charType === 3 && randomRange(1, 100) <= 2) {
+        // 태성 전용: 1% 확률로 최대 강화 도달
+        if (playerInfo.charType === 3 && randomRange(1, 100) <= 1) {
             recentState = EnhanceState.NothingHappened;
             playerInfo.weaponEnhance = 10; // 강화 최대치
             playerInfo.gameOver = true;

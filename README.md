@@ -2,6 +2,10 @@
 
 Simple Game to determine who is win or lose.
 
+To play: https://www.readiz.com/RandomGame/
+
+
+
 Svelte now officially suports Typescript: https://svelte.dev/blog/svelte-and-typescript This repo is therefore archived
 
 # Svelte + Typescript + Rollup

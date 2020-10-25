@@ -132,6 +132,7 @@
         background-color: palevioletred;
     }
     div.playerContainer[recentState="BigFailed"] {
+        animation: shake 0.5s;
         background-color: red;
     }
     div.playerContainer[isAutoPlaying=true] {
@@ -159,7 +160,7 @@
 
 <div bind:this={me} class="playerContainer" recentState={recentState} isAutoPlaying={ ($GameAutoProcess > 0) && isGameStarted && !playerInfo.gameOver}>
     {#if !isGameStarted}
-        <input bind:value={playerInfo.name} />
+        <input class="form-control" bind:value={playerInfo.name} />
     {:else}
         <b>{playerInfo.name}</b>
         - {name} <img src={'./c' + playerInfo.charType + '.png'} width=20 height=20 alt="" />

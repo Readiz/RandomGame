@@ -50,9 +50,7 @@
       });
       uid++;
     }
-    if (winnerRank > playerNum) {
-      winnerRank = playerNum;
-    }
+    winnerRank = playerNum;
   })(playerNum)
 
   let resultText = '';
@@ -107,12 +105,16 @@
     height: 100vh;
     padding: 15px;
   }
+  div.cardArea {
+    text-align: center;
+  }
+  
 </style>
 
 <h1>운빨망겜</h1> 
 <p>
 당신의 운을 시험해서 승자가 되세요.<br>
-무기를 강화해 보세요!
+무기를 강화해 내기에서 승리하세요!
 </p>
 
 {#if !isGameStarted}
@@ -123,13 +125,13 @@
 </label>
 <br>
 <label>
-  우승 등수:
+  내기 등수:
 	<input type=number bind:value={winnerRank} min=1 max={playerNum}>
 	<input type=range bind:value={winnerRank} min=1 max={playerNum}>
 </label>
 {/if}
 
-<div>
+<div class="cardArea">
   {#each players as player (player.uid)}
   <PlayerCard playerInfo={player} isGameStarted={isGameStarted} handleGameOver={handleGameOver} />
   {/each}

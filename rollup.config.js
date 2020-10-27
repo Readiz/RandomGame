@@ -24,7 +24,8 @@ const plugins = [
   commonjs({ include: "node_modules/**", extensions: [".js"] }),
   resolve(),
   html2({
-    template: "src/index.html",
+    template: 'src/index.html',
+    onlinePath: '.'
   }),
   static_files({
     include: ['./img']

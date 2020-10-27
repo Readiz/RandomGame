@@ -163,7 +163,8 @@
         <input class="form-control" bind:value={playerInfo.name} />
     {:else}
         <b>{playerInfo.name}</b>
-        - {name} <img src={'./c' + playerInfo.charType + '.png'} width=20 height=20 alt="" />
+        <br>
+        {name} <img src={'./c' + playerInfo.charType + '.png'} width=20 height=20 alt="" />
     {/if}
     
     <hr>

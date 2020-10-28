@@ -91,7 +91,7 @@
       // 태성 전용: 50% 확률로 대성공
       if (playerInfo.charType === 3 && randomRange(1, 100) <= 50) {
         recentState = EnhanceState.BigSuccess;
-        playerInfo.weaponEnhance++; // 강화 수치 추가 Up
+        playerInfo.weaponEnhance += 2; // 강화 수치 추가 Up
       } else if (playerInfo.charType === 5) {
         // 벤자민 전용: 성공시 강화도 감소
         recentState = EnhanceState.Success;

@@ -35,10 +35,10 @@
                 desc = '지옥의 검'
                 break;
             case 9:
-                desc = '그린 세이버'
+                desc = '레드 세이버'
                 break;
             case 10:
-                desc = '블루 세이버'
+                desc = '그린 세이버'
                 break;
             case 11:
             case 12:
@@ -50,7 +50,7 @@
             case 18:
             case 19:
             case 20:
-                desc = '레드 세이버'
+                desc = '블루 세이버'
                 break;
         }
     })(step);

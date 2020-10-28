@@ -3,76 +3,54 @@
     let width = 50;
     let path = '';
     let desc = '';
-    $: width = 50 + (step * 5);
+    $: width = 50 + (step * 4);
     $: ((step) => {
+        path = './' + ((step < 11)? step : 11) + '.png';
         switch (step) {
             case 0:
-            case 1:
-                path = './12.png';
-                break;
-            case 2:
-            case 3:
-                path = './34.png';
-                break;
-            case 4:
-            case 5:
-                path = './56.png';
-                break;
-            case 6:
-            case 7:
-                path = './78.png';
-                break;
-            case 8:
-            case 9:
-            case 10:
-            case 11:
-            case 12:
-            case 13:
-            case 14:
-            case 15:
-            case 16:
-                path = './90.png';
-                break;
-        }
-        switch (step) {
-            case 0:
-                desc = '흔한 검';
+                desc = '단검';
                 break;
             case 1:
-                desc = '덜 흔한 검';
+                desc = '단도';
                 break;
             case 2:
-                desc = '익숙해진 검';
-                break;
-            case 3:
                 desc = '검';
                 break;
+            case 3:
+                desc = '시퍼런 검';
+                break;
             case 4:
-                desc = '일반 검';
+                desc = '용사의 검';
                 break;
             case 5:
-                desc = '괜찮은 검';
+                desc = '이터널 러브';
                 break;
             case 6:
-                desc = '좋은 검'
+                desc = '아이스 소드'
                 break;
             case 7:
-                desc = '명검'
+                desc = '에메랄드 소드'
                 break;
             case 8:
-                desc = '기적의 검'
+                desc = '지옥의 검'
                 break;
             case 9:
-                desc = '전설의 검'
+                desc = '그린 세이버'
                 break;
             case 10:
+                desc = '블루 세이버'
+                break;
             case 11:
             case 12:
             case 13:
             case 14:
             case 15:
             case 16:
-                desc = '세계관 최강의 검'
+            case 17:
+            case 18:
+            case 19:
+            case 20:
+                desc = '레드 세이버'
                 break;
         }
     })(step);

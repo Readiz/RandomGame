@@ -50,8 +50,8 @@
       });
       uid++;
     }
-    winnerRank = playerNum;
   })(playerNum)
+  $: winnerRank = playerNum;
 
   let resultText = '';
   function handleGameOver() {

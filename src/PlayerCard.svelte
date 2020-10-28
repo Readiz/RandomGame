@@ -48,7 +48,7 @@
   function startGame() {
     // 0번의 경우 랜덤 캐릭터이므로
     if (playerInfo.charType === 0) {
-      playerInfo.charType = randomRange(1, 4);
+      playerInfo.charType = randomRange(1, 5);
     }
     if (playerInfo.charType === 2) {
       // 주유
@@ -64,6 +64,13 @@
       playerInfo.enhanceDurability = 6;
       playerInfo.enhanceWarranty = 0;
       stepSuccessProb = 0.8;
+    }
+    if (playerInfo.charType === 5) {
+      // 벤자민
+      playerInfo.weaponEnhance = 11;
+      playerInfo.enhanceDurability = 3;
+      playerInfo.enhanceWarranty = 0;
+      stepSuccessProb = 1;
     }
   }
   function endGame() {
@@ -81,23 +88,32 @@
       playerInfo.weaponEnhance < playerInfo.enhanceWarranty || // 강화 보장 구간이거나
       randomRange(1, 100) < stepSuccessProb * 100
     ) {
-      // 확률로 성공~!
-      recentState = EnhanceState.Success;
-      playerInfo.weaponEnhance++; // 강화 수치 Up
-      
       // 태성 전용: 50% 확률로 대성공
       if (playerInfo.charType === 3 && randomRange(1, 100) <= 50) {
         recentState = EnhanceState.BigSuccess;
         playerInfo.weaponEnhance++; // 강화 수치 추가 Up
+      } else if (playerInfo.charType === 5) {
+        // 벤자민 전용: 성공시 강화도 감소
+        recentState = EnhanceState.Success;
+        playerInfo.weaponEnhance--; // 강화 수치 Down
+      } else {
+        // 확률로 성공~!
+        recentState = EnhanceState.Success;
+        playerInfo.weaponEnhance++; // 강화 수치 Up
       }
     } else {
       // 실패~!
       recentState = EnhanceState.Failed;
       playerInfo.enhanceDurability -= 1; // 내구도 깎자~~
-      if (randomRange(1, 100) <= 30) {
+      if (randomRange(1, 100) <= 50) {
         if (playerInfo.weaponEnhance > 0) {
           recentState = EnhanceState.BigFailed;
-          playerInfo.weaponEnhance -= 1; // 50% 확률로 강화도 깎자~
+          if (playerInfo.charType === 5) {
+            // 벤자민 전용: 대실패시 강화도 증가
+            playerInfo.weaponEnhance += 1; // 강화 수치 Up
+          } else {
+            playerInfo.weaponEnhance -= 1; // 50% 확률로 강화도 깎자~
+          }
         }
       }
       if (playerInfo.enhanceDurability === 0) {
@@ -116,6 +132,10 @@
     }
     if (playerInfo.charType === 2) stepSuccessProb *= 0.5;
     else if (playerInfo.charType === 4) stepSuccessProb *= 0.8;
+    else if (playerInfo.charType === 5) {
+      stepSuccessProb = 1 - (11 - playerInfo.weaponEnhance) * 0.1;
+      if (stepSuccessProb < 0) stepSuccessProb = 0;
+    }
   }
   $: ((gameOver) => {
     if (gameOver) {

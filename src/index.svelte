@@ -142,8 +142,8 @@ import Durability from './Durability.svelte';
 
 <label>
   게임 인원 수:
-	<input type=number bind:value={playerNum} min=1 max=10>
-	<input type=range bind:value={playerNum} min=1 max=10>
+	<input type=number bind:value={playerNum} min=1 max=20>
+	<input type=range bind:value={playerNum} min=1 max=20 style="width:300px">
 </label>
 <br>
 
@@ -240,11 +240,12 @@ import Durability from './Durability.svelte';
 <h3>튜토리얼</h3>
 <ol>
   <li>게임이 사직되면, 각 플레이어는 각 플레이어의 특성에 맞는 스탯을 부여 받습니다.</li>
-  <li>무기 강화를 시도하게 되면, 강화도가 1 상승하거나, 유지되거나, 하락할 수 있습니다.</li>
+  <li>무기 강화를 시도하게 되면, 강화도가 1 상승하거나(성공), 유지되거나(실패), 하락할 수 있습니다(대실패).</li>
   <li>각 플레이어는 무기의 내구도가 모두 소모될 때까지 강화를 계속 시도 해야 합니다.</li>
-  <li>모든 플레이어의 강화가 끝나면, 처음에 설정한 순위의 사람이 당첨 되게 됩니다.</li>
+  <li>모든 플레이어의 강화가 끝나면(=모든 플레이어의 무기 내구도가 모두 소모되면), 게임 시작시 설정한 순위의 사람이 당첨됩니다.</li>
   <li>순위는 무기 강화도가 높은 사람이 높습니다. 만약 동점자가 있다면 동점자끼리 간이 재경기가 시작됩니다.</li>
-  <li>게임이 시작되면 자동 진행을 할 수 있으며, 자동진행을 하게 되면 모든 플레이어의 강화가 끝날 때까지 게임이 지속 됩니다.</li>
+  <li>재경기 시에는 재경기에 돌입하는 사람들이 내구도를 1 추가로 부텨 받아 경기가 시작됩니다.</li>
+  <li>게임이 시작되면 자동진행을 할 수 있으며, 모든 플레이어의 강화가 끝날 때까지 자동진행이 지속 됩니다.</li>
 </ol>
 
 <h4>캐릭터 특성 설명</h4>
@@ -253,4 +254,8 @@ import Durability from './Durability.svelte';
   <li>{CharType.name}: {CharType.desc}</li>
   {/each}
 </ul>
+
+<b>Ver 2020/10/29</b><br>
+<b>Made by</b> Readiz<br>
+Special Thanks to HG
 {/if}

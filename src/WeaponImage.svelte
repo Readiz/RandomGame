@@ -25,6 +25,12 @@
             case 8:
             case 9:
             case 10:
+            case 11:
+            case 12:
+            case 13:
+            case 14:
+            case 15:
+            case 16:
                 path = './90.png';
                 break;
         }
@@ -60,6 +66,12 @@
                 desc = '전설의 검'
                 break;
             case 10:
+            case 11:
+            case 12:
+            case 13:
+            case 14:
+            case 15:
+            case 16:
                 desc = '세계관 최강의 검'
                 break;
         }

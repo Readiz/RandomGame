@@ -72,7 +72,7 @@
 </div>
 <br>
 {#if step === 0}
-<h5>{desc}</h5>
+<h6>{desc}</h6>
 {:else}
-<h5><b>+{step}</b> {desc}</h5>
+<h6><b>+{step}</b> {desc}</h6>
 {/if}

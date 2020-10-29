@@ -150,8 +150,8 @@
     display: inline-block;
     border: 1px solid black;
     border-radius: 5px;
-    margin: 5px;
-    width: 200px;
+    margin: 2px;
+    width: 140px;
     text-align: center;
   }
   div.playerContainer[recentState="BigSuccess"] {
@@ -173,6 +173,9 @@
 
     /* When the animation is finished, start again */
     animation-iteration-count: infinite;
+  }
+  div.btn small {
+    font-size: x-small;
   }
 
   @keyframes shake {
@@ -262,7 +265,7 @@
       {#if $GameAutoProcess === 0}
         <br />
         <div class="btn btn-lg btn-warning" on:click={handleEnhancement}>
-          <b>강화 도전!!!</b><br />
+          <b>강화 도전</b><br />
           {#if playerInfo.enhanceWarranty > playerInfo.weaponEnhance}
             <small>강화 보장 구간</small>
           {:else}

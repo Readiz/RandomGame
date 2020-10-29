@@ -13,6 +13,6 @@
     })(durability);
 </script>
 
-<span>
+<small>
 {durabilityText}
-</span>
+</small>

@@ -22,6 +22,10 @@
     // do nothing on default
   };
   export let isGameStarted = false;
+  export let gameMode = -1; // -1: 표준
+  export let forceChar = 0;
+  $: if (gameMode === 0) playerInfo.charType = 0;
+     else if (gameMode === 1) playerInfo.charType = forceChar;
   let stepSuccessProb = 1.0;
   const EnhanceState = {
     Failed: "Failed",
@@ -52,8 +56,8 @@
     }
     if (playerInfo.charType === 2) {
       // 주유
+      playerInfo.enhanceDurability = 2;
       playerInfo.enhanceWarranty = 5;
-      stepSuccessProb = 0.5;
     }
     if (playerInfo.charType === 3) {
       // 태성
@@ -96,6 +100,7 @@
         // 벤자민 전용: 성공시 강화도 감소
         recentState = EnhanceState.Success;
         playerInfo.weaponEnhance--; // 강화 수치 Down
+        if (playerInfo.weaponEnhance < 0) playerInfo.weaponEnhance = 0; // 음수 방지..
       } else {
         // 확률로 성공~!
         recentState = EnhanceState.Success;
@@ -113,6 +118,7 @@
             playerInfo.weaponEnhance += 1; // 강화 수치 Up
           } else {
             playerInfo.weaponEnhance -= 1; // 50% 확률로 강화도 깎자~
+            if (playerInfo.weaponEnhance < 0) playerInfo.weaponEnhance = 0; // 음수 방지.. (강보 때문에 이럴 일은 없긴 함)
           }
         }
       }
@@ -125,16 +131,16 @@
     // 다음 단계 확률 계산!
     if (playerInfo.weaponEnhance < 10) {
       // 1 ~ 2강: 100%, 3강: 90%, 4강: 80%, 5강: 70%, 6강: 60%, 7강: 50%, 8강: 40%, ... 
-      stepSuccessProb = 1 - (playerInfo.weaponEnhance - 2) * 0.1;
+      stepSuccessProb = 1 - (playerInfo.weaponEnhance - 3) * 0.1;
       if (stepSuccessProb > 1) stepSuccessProb = 1;
     } else { // 10강 이상은 1% 확률로 고정
       stepSuccessProb = 0.01;
     }
-    if (playerInfo.charType === 2) stepSuccessProb *= 0.5;
-    else if (playerInfo.charType === 4) stepSuccessProb *= 0.8;
-    else if (playerInfo.charType === 5) {
+    if (playerInfo.charType === 4) stepSuccessProb *= 0.8;
+    else if (playerInfo.charType === 5) { // 벤자민은 확률이 반대개념
       stepSuccessProb = 1 - (11 - playerInfo.weaponEnhance) * 0.1;
-      if (stepSuccessProb < 0) stepSuccessProb = 0;
+      if (stepSuccessProb > 1) stepSuccessProb = 1;
+      if (stepSuccessProb < 0.1) stepSuccessProb = 0.1;
     }
   }
   $: ((gameOver) => {
@@ -174,8 +180,12 @@
     /* When the animation is finished, start again */
     animation-iteration-count: infinite;
   }
+  div.btn {
+    width: 100%;
+  }
   div.btn small {
-    font-size: x-small;
+    line-height: 2.5;
+    font-size: small;
   }
 
   @keyframes shake {
@@ -232,9 +242,6 @@
       height="20"
       alt="" />
   {/if}
-
-  <hr />
-
   {#if !isGameStarted}
     <img
       src={'./c' + playerInfo.charType + '.png'}
@@ -242,6 +249,7 @@
       height="100"
       alt="" />
     <br />
+    {#if gameMode == -1}
     <label>
       <select class="form-control" bind:value={playerInfo.charType}>
         {#each CharTypes as charType}
@@ -249,27 +257,26 @@
         {/each}
       </select>
     </label>
+    {:else}
+      {CharTypes[playerInfo.charType].name}
+    {/if}
   {/if}
 
   {#if isGameStarted}
     <WeaponImage step={playerInfo.weaponEnhance} />
     {#if isGameStarted && playerInfo.gameOver}
-      <br /><span style="color:black">게임 오버!</span><br /><br />
+    <!-- 게임 오버 메시지 --><br />
     {/if}
 
     {#if isGameStarted && !playerInfo.gameOver}
-      <b>남은 강화 내구도</b><br />
       <Durability durability={playerInfo.enhanceDurability} />
       <br />
-      <b>강화 보장</b> +{playerInfo.enhanceWarranty}
       {#if $GameAutoProcess === 0}
-        <br />
         <div class="btn btn-lg btn-warning" on:click={handleEnhancement}>
-          <b>강화 도전</b><br />
-          {#if playerInfo.enhanceWarranty > playerInfo.weaponEnhance}
-            <small>강화 보장 구간</small>
+          {#if playerInfo.enhanceWarranty > playerInfo.weaponEnhance || stepSuccessProb == 1}
+            <small><b>강화!</b> 보장 구간</small>
           {:else}
-            <small>성공확률: {Math.round(stepSuccessProb * 100)}%</small>
+            <small><b>강화!</b> 확률: {Math.round(stepSuccessProb * 100)}%</small>
           {/if}
         </div>
       {/if}

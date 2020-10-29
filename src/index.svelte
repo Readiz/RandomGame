@@ -1,6 +1,5 @@
 <script>
   import { tick } from 'svelte';
-import Durability from './Durability.svelte';
   import PlayerCard from './PlayerCard.svelte';
   import {GameState, GameLifeCycle, GameAutoProcess, CharTypes} from './store';
   let isGameStarted = false;
@@ -8,32 +7,12 @@ import Durability from './Durability.svelte';
   let isRematch = false;
   let playerNum = 4;
   let winnerPlayers = [];
-  let winnerRank = 9999;
-  let uid = 0;
-  let players = [
-    {
-      uid: -1,
-      id: 1,
-      name: '',
-      charType: 0,
-      enhanceDurability: 3,
-      enhanceWarranty: 3,
-      weaponEnhance: 0,
-      highlight: false,
-      gameOver: false
-    },
-    {
-      uid: -1,
-      id: 2,
-      name: '',
-      charType: 0,
-      enhanceDurability: 3,
-      enhanceWarranty: 3,
-      weaponEnhance: 0,
-      highlight: false,
-      gameOver: false
-    }
-  ];
+  let winnerRank = 9999; // 9999 : the lowest
+  let uid = 0; // Unique IDs for players
+  let resultText = '';
+  let players = [];
+  let gameMode = -1;
+  let forceChar = 1;
   $: updatePlayerNum(playerNum);
 
   function updatePlayerNum(playerNum) {
@@ -53,8 +32,6 @@ import Durability from './Durability.svelte';
       uid++;
     }
   }
-
-  let resultText = '';
   function handleGameOver() {
     let isAllGameOver = true;
     for (const player of players) {
@@ -96,11 +73,11 @@ import Durability from './Durability.svelte';
         // resultText += `무기강화 결과: ${player.weaponEnhance}강<br>`;
       }
       if (winnerPlayers.length === 1) {
-        resultText += `<hr><h4>${winnerPlayers[0].name} 님, ${winnerRank === 1 ? '1': '꼴'}등 축하드립니다.</h4>`;
-        resultText += '기분 좋은 마음으로 커피를 쏘면 어떨까요?<br>';
+        resultText += `<h4>${winnerPlayers[0].name} 님, ${winnerRank === 1 ? '1': '꼴'}등 축하드립니다.</h4>`;
+        resultText += '기분 좋은 마음으로 커피를 쏘면 어떨까요?';
       } else {
-        resultText += `<hr><h4>${winnerRank === 1 ? '1': '꼴'}등에 대한 동점자가 나왔군요!</h4><br><b>대상자: ` + winnerPlayerNames.join(' 님, ') + ' 님.</b><br>';
-        resultText += '동점자끼리 재경기를 원하시면 아래 버튼을 눌러주세요.<br>';
+        resultText += `<h4>${winnerRank === 1 ? '1': '꼴'}등에 대한 동점자가 나왔군요!</h4><br><b>대상자: ` + winnerPlayerNames.join(' 님, ') + ' 님.</b><br>';
+        resultText += '동점자끼리 재경기를 원하시면 아래 버튼을 눌러주세요.';
         isRematch = true;
       }
     }
@@ -129,7 +106,6 @@ import Durability from './Durability.svelte';
     text-align: center;
   }
   div.resultArea {
-    text-align: center;
   }
 </style>
 
@@ -142,8 +118,8 @@ import Durability from './Durability.svelte';
 
 <label>
   게임 인원 수:
-	<input type=number bind:value={playerNum} min=1 max=20>
-	<input type=range bind:value={playerNum} min=1 max=20 style="width:250px">
+	<input type=number bind:value={playerNum} min=1 max=30>
+	<input type=range bind:value={playerNum} min=1 max=30 style="width:250px">
 </label>
 <br>
 
@@ -153,88 +129,106 @@ import Durability from './Durability.svelte';
   1등
 </label>
 <label>
-    <input type=radio bind:group={winnerRank} value={9999}>
-    꼴등
+  <input type=radio bind:group={winnerRank} value={9999}>
+  꼴등
 </label>
-{/if}
+<br>
 
-<div class="cardArea">
-  {#each players as player (player.uid)}
-  <PlayerCard playerInfo={player} isGameStarted={isGameStarted} handleGameOver={handleGameOver} />
-  {/each}
-</div>
-
-<div class="resultArea">
-{#if !isGameStarted}
+게임 모드:
+<label>
+  <input type=radio bind:group={gameMode} value={-1}>
+  표준
+</label>
+<label>
+  <input type=radio bind:group={gameMode} value={0}>
+  올랜덤
+</label>
+<label>
+  <input type=radio bind:group={gameMode} value={1}>
+  동캐전
+  {#if gameMode == 1}
+  <select bind:value={forceChar}>
+    {#each CharTypes as charType}
+    {#if charType.id != 0}
+    <option value={charType.id}>{charType.name}</option>
+    {/if}
+    {/each}
+  </select>
+  {/if}
+</label>
+<br>
 <div class="btn btn-md btn-primary" on:click={() => {
   isGameStarted = true;
   $GameState = GameLifeCycle.Started;
 }}>
-<h2>
+<h5>
 게임 시작!
-</h2>
-</div>
-{/if}
-{#if isGameStarted && !isAllGameOvered && !$GameAutoProcess} 
-<div class="btn btn-lg btn-info" on:click={() => {
-  (async () => {
-    while (!isAllGameOvered) {
-      $GameAutoProcess += 1;
-      await tick();
-      await timeout(400);
-    }
-  })();
-}}>
-<h2>
-게임 자동 진행
-</h2>
+</h5>
 </div>
 {/if}
 
-{#if isAllGameOvered}
-{@html resultText}
-{#if isRematch}
-<div class="btn btn-md btn-primary" on:click={() => {
-  (async () => {
+
+<div class="resultArea">
+  {#if isAllGameOvered}
+  {@html resultText}
+  <br><br>
+  {#if isRematch}
+  <div class="btn btn-md btn-primary" on:click={() => {
+    (async () => {
+      isAllGameOvered = false;
+      isGameStarted = true;
+      isRematch = false;
+      $GameState = GameLifeCycle.NotStarted;
+      $GameAutoProcess = 0;
+      // To rematch: Add enhanceDurability!
+      winnerPlayers = winnerPlayers.map(player => {
+        player.enhanceDurability += 1;
+        player.gameOver = false;
+        return player;
+      });
+      players = winnerPlayers;
+      await tick();
+    })();
+  }}>
+  <h2>동점자 리매치</h2>
+  동점자들끼리 내구도 1로 현재 상태에서 강화를 추가로 시도합니다.
+  </div>
+  {:else}
+  <div class="btn btn-md btn-danger" on:click={() => {
     isAllGameOvered = false;
-    isGameStarted = true;
+    isGameStarted = false;
     isRematch = false;
     $GameState = GameLifeCycle.NotStarted;
     $GameAutoProcess = 0;
-    // To rematch: Add enhanceDurability!
-    winnerPlayers = winnerPlayers.map(player => {
-      player.enhanceDurability += 1;
-      player.gameOver = false;
-      return player;
-    });
-    players = winnerPlayers;
-    await tick();
+    // To reset
+    updatePlayerNum(playerNum);
+  }}>
+  게임 재시작
+  </div>
+  {/if}
+  <hr>
+  {/if}
+  {#if isGameStarted && !isAllGameOvered && !$GameAutoProcess} 
+  <div class="btn btn-lg btn-info" on:click={() => {
+    (async () => {
+      while (!isAllGameOvered) {
+        $GameAutoProcess += 1;
+        await tick();
+        await timeout(400);
+      }
+    })();
+  }}>
+  자동 진행
+  </div>
+  <hr>
+  {/if}
+</div>
+<div class="cardArea">
+  {#each players as player (player.uid)}
+  <PlayerCard playerInfo={player} isGameStarted={isGameStarted} handleGameOver={handleGameOver} gameMode={gameMode} forceChar={forceChar} />
+  {/each}
+</div>
 
-    // while (!isAllGameOvered) {
-    //  $GameAutoProcess += 1;
-    //  await tick();
-    //  await timeout(400);
-    // }
-  })();
-}}>
-<h2>동점자 리매치</h2>
-동점자들끼리 내구도 1로 현재 상태에서 강화를 추가로 시도합니다.
-</div>
-{:else}
-<div class="btn btn-md btn-danger" on:click={() => {
-  isAllGameOvered = false;
-  isGameStarted = false;
-  isRematch = false;
-  $GameState = GameLifeCycle.NotStarted;
-  $GameAutoProcess = 0;
-  // To reset
-  updatePlayerNum(playerNum);
-}}>
-게임 재시작
-</div>
-{/if}
-{/if}
-</div>
 <br><br>
 {#if !isGameStarted}
 <h3>튜토리얼</h3>
@@ -255,7 +249,7 @@ import Durability from './Durability.svelte';
   {/each}
 </ul>
 
-<b>Ver 2020/10/29</b><br>
+<b>Ver.</b> 2020/10/29<br>
 <b>Made by</b> Readiz<br>
-Special Thanks to HG
+<b>Special Thanks to</b> HG
 {/if}

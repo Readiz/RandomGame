@@ -14,5 +14,5 @@
 </script>
 
 <small>
-{durabilityText}
+<b>HP</b> {durabilityText}
 </small>

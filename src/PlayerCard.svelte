@@ -86,7 +86,7 @@
 
     if (
       playerInfo.weaponEnhance < playerInfo.enhanceWarranty || // 강화 보장 구간이거나
-      randomRange(1, 100) < stepSuccessProb * 100
+      randomRange(1, 100) <= stepSuccessProb * 100
     ) {
       // 태성 전용: 50% 확률로 대성공
       if (playerInfo.charType === 3 && randomRange(1, 100) <= 50) {

@@ -125,21 +125,19 @@
       // 실패~!
       playerInfo.enhanceDurability -= 1; // 내구도 깎자~~
       GameLog.push(`${playerInfo.name}, ${Math.round(stepSuccessProb * 100)}%의 확률을 뚫지 못하여 강화에 실패 하였습니다..`);
-      if (randomRange(1, 100) <= 50) {
-        if (playerInfo.weaponEnhance > 0) {
-          recentState = EnhanceState.BigFailed;
-          GameLog.push(`   - 손이 미끄러져서 강화에 대실패 하였습니다! 강화도 -1!`);
-          if (playerInfo.charType === 5) {
-            // 벤자민 전용: 대실패시 강화도 증가
-            playerInfo.weaponEnhance += 1; // 강화 수치 Up
-            GameLog.push(`   - 일 줄 알았지만, 벤자민의 강화는 거꾸로 갑니다! 강화도는 감소되지 않고 증가합니다! 강화도 +1!`);
-          } else {
-            playerInfo.weaponEnhance -= 1; // 50% 확률로 강화도 깎자~
-            if (playerInfo.weaponEnhance < 0) playerInfo.weaponEnhance = 0; // 음수 방지.. (강보 때문에 이럴 일은 없긴 함)
-          }
-          if (playerInfo.enhanceDurability !== 0) // 어차피 마지막이면 강화도 보여주니 이외의 경우에만 출력
-            GameLog.push(`   - 무기 강화도: +${playerInfo.weaponEnhance}`);
+      if (randomRange(1, 100) <= 50 && playerInfo.weaponEnhance > 0) {
+        recentState = EnhanceState.BigFailed;
+        GameLog.push(`   - 손이 미끄러져서 강화에 대실패 하였습니다! 강화도 -1!`);
+        if (playerInfo.charType === 5) {
+          // 벤자민 전용: 대실패시 강화도 증가
+          playerInfo.weaponEnhance += 1; // 강화 수치 Up
+          GameLog.push(`   - 일 줄 알았지만, 벤자민의 강화는 거꾸로 갑니다! 강화도는 감소되지 않고 증가합니다! 강화도 +1!`);
+        } else {
+          playerInfo.weaponEnhance -= 1; // 50% 확률로 강화도 깎자~
+          if (playerInfo.weaponEnhance < 0) playerInfo.weaponEnhance = 0; // 음수 방지.. (강보 때문에 이럴 일은 없긴 함)
         }
+        if (playerInfo.enhanceDurability !== 0) // 어차피 마지막이면 강화도 보여주니 이외의 경우에만 출력
+          GameLog.push(`   - 무기 강화도: +${playerInfo.weaponEnhance}`);
       } else {
         recentState = EnhanceState.Failed;
       }

@@ -154,7 +154,7 @@
     // 다음 단계 확률 계산!
     if (playerInfo.weaponEnhance < 10) {
       // 1 ~ 2강: 100%, 3강: 90%, 4강: 80%, 5강: 70%, 6강: 60%, 7강: 50%, 8강: 40%, ... 
-      stepSuccessProb = 1 - (playerInfo.weaponEnhance - 3) * 0.1;
+      stepSuccessProb = 1 - (playerInfo.weaponEnhance - 2) * 0.1;
       if (stepSuccessProb > 1) stepSuccessProb = 1;
     } else { // 10강 이상은 1% 확률로 고정
       stepSuccessProb = 0.01;

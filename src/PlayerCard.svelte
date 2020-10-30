@@ -5,6 +5,7 @@
     GameAutoProcess,
     CharTypes,
   } from "./store";
+  import { randomRange } from './utils';
   import WeaponImage from "./WeaponImage.svelte";
   import Durability from "./Durability.svelte";
   export let playerInfo = {
@@ -25,7 +26,7 @@
   export let gameMode = -1; // -1: 표준
   export let forceChar = 0;
   $: if (gameMode === 0) playerInfo.charType = 0;
-     else if (gameMode === 1) playerInfo.charType = forceChar;
+     else if (gameMode === 1 || gameMode === 2) playerInfo.charType = forceChar;
   let stepSuccessProb = 1.0;
   const EnhanceState = {
     Failed: "Failed",
@@ -52,7 +53,7 @@
   function startGame() {
     // 0번의 경우 랜덤 캐릭터이므로
     if (playerInfo.charType === 0) {
-      playerInfo.charType = randomRange(1, 5);
+      playerInfo.charType = randomRange(1, CharTypes.length - 1);
     }
     if (playerInfo.charType === 2) {
       // 주유
@@ -79,9 +80,6 @@
   }
   function endGame() {
     // ToDO
-  }
-  function randomRange(n1, n2) {
-    return Math.floor(Math.random() * (n2 - n1 + 1) + n1);
   }
   function handleEnhancement() {
     if (playerInfo.gameOver) {
@@ -243,22 +241,32 @@
       alt="" />
   {/if}
   {#if !isGameStarted}
-    <img
-      src={'./c' + playerInfo.charType + '.png'}
-      width="100"
-      height="100"
-      alt="" />
-    <br />
-    {#if gameMode == -1}
-    <label>
-      <select class="form-control" bind:value={playerInfo.charType}>
-        {#each CharTypes as charType}
-          <option value={charType.id}>{charType.name}</option>
-        {/each}
-      </select>
-    </label>
+    {#if gameMode == 2}
+      <img
+        src={'./c0.png'}
+        width="100"
+        height="100"
+        alt="" />
+      <br />
+      동일랜덤
     {:else}
-      {CharTypes[playerInfo.charType].name}
+      <img
+        src={'./c' + playerInfo.charType + '.png'}
+        width="100"
+        height="100"
+        alt="" />
+      <br />
+      {#if gameMode == -1}
+      <label>
+        <select class="form-control" bind:value={playerInfo.charType}>
+          {#each CharTypes as charType}
+            <option value={charType.id}>{charType.name}</option>
+          {/each}
+        </select>
+      </label>
+      {:else}
+        {CharTypes[playerInfo.charType].name}
+      {/if}
     {/if}
   {/if}
 

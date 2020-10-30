@@ -2,6 +2,7 @@
   import { tick } from 'svelte';
   import PlayerCard from './PlayerCard.svelte';
   import {GameState, GameLifeCycle, GameAutoProcess, CharTypes} from './store';
+  import { randomRange } from './utils';
   let isGameStarted = false;
   let isAllGameOvered = false;
   let isRematch = false;
@@ -11,10 +12,16 @@
   let uid = 0; // Unique IDs for players
   let resultText = '';
   let players = [];
-  let gameMode = -1;
+  let gameMode = 2;
   let forceChar = 1;
   $: updatePlayerNum(playerNum);
+  $: assignCharAccordingToGameMode(gameMode);
 
+  function assignCharAccordingToGameMode(gameMode) {
+    if (gameMode === 2) { // 동일 랜덤
+      forceChar = randomRange(1, CharTypes.length - 1);
+    }
+  }
   function updatePlayerNum(playerNum) {
     players = [];
     for (let i = 0; i < playerNum; i++) {
@@ -136,12 +143,16 @@
 
 게임 모드:
 <label>
-  <input type=radio bind:group={gameMode} value={-1}>
-  표준
+  <input type=radio bind:group={gameMode} value={2}>
+  동일랜덤
 </label>
 <label>
   <input type=radio bind:group={gameMode} value={0}>
   올랜덤
+</label>
+<label>
+  <input type=radio bind:group={gameMode} value={-1}>
+  개인선택
 </label>
 <label>
   <input type=radio bind:group={gameMode} value={1}>
@@ -202,6 +213,7 @@
     $GameAutoProcess = 0;
     // To reset
     updatePlayerNum(playerNum);
+    assignCharAccordingToGameMode(gameMode);
   }}>
   게임 재시작
   </div>
@@ -214,7 +226,7 @@
       while (!isAllGameOvered) {
         $GameAutoProcess += 1;
         await tick();
-        await timeout(400);
+        await timeout(1000);
       }
     })();
   }}>

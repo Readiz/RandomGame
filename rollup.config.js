@@ -39,7 +39,7 @@ if (isDevelopment) {
       host: '0.0.0.0',
       port: 1523 // WSL: 1522 (SSH) ~ 1528 is opened for test.
     }),
-    livereload({ watch: "./src" })
+    livereload({ watch: "./src", port: 1524 })
   );
 } else {
   plugins.push(terser({ sourcemap: true }));

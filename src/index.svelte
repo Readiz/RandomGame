@@ -3,6 +3,7 @@
   import PlayerCard from './PlayerCard.svelte';
   import {GameState, GameLifeCycle, GameAutoProcess, CharTypes} from './store';
   import { randomRange } from './utils';
+  let GameLog = [];
   let isGameStarted = false;
   let isAllGameOvered = false;
   let isRematch = false;
@@ -46,7 +47,7 @@
         isAllGameOver = false;
       }
     }
-    if (isAllGameOver) {
+    if (isAllGameOver && !isAllGameOvered) {
       isAllGameOvered = true;
       let rank = 0;
       let currentCheckingEnhance = 99999;
@@ -79,15 +80,35 @@
         // resultText += `<b>${rank}등: ${player.name} 님</b> / `;
         // resultText += `무기강화 결과: ${player.weaponEnhance}강<br>`;
       }
+      GameLog.push(`------------------------------------------`);
       if (winnerPlayers.length === 1) {
+        updateHighlight([winnerPlayers[0]]);
         resultText += `<h4>${winnerPlayers[0].name} 님, ${winnerRank === 1 ? '1': '꼴'}등 축하드립니다.</h4>`;
+        resultText += `<b>달성한 강화도: ${winnerPlayers[0].weaponEnhance}</b><br>`;
         resultText += '기분 좋은 마음으로 커피를 쏘면 어떨까요?';
+        GameLog.push(`게임 종료! ${winnerPlayers[0].name} 님, ${winnerRank === 1 ? '1': '꼴'}등 축하드립니다.`);
+        GameLog.push(`달성한 강화도: ${winnerPlayers[0].weaponEnhance}`);
+        GameLog.push(`기분 좋은 마음으로 커피를 쏘면 어떨까요?`);
       } else {
-        resultText += `<h4>${winnerRank === 1 ? '1': '꼴'}등에 대한 동점자가 나왔군요!</h4><br><b>대상자: ` + winnerPlayerNames.join(' 님, ') + ' 님.</b><br>';
+        updateHighlight(winnerPlayers);
+        resultText += `<h4>${winnerRank === 1 ? '1': '꼴'}등에 대한 동점자가 나왔군요!</h4><b>대상자: ` + winnerPlayerNames.join(' 님, ') + ' 님.</b><br>';
+        resultText += `<b>달성한 강화도: ${winnerPlayers[0].weaponEnhance}</b><br>`;
         resultText += '동점자끼리 재경기를 원하시면 아래 버튼을 눌러주세요.';
         isRematch = true;
+        GameLog.push(`게임 종료! ${winnerRank === 1 ? '1': '꼴'}등에 대한 동점자가 나왔습니다. ${winnerPlayerNames.join(' 님, ')}  님.`);
+        GameLog.push(`달성한 강화도: ${winnerPlayers[0].weaponEnhance}`);
       }
+      GameLog = GameLog;
     }
+  }
+  function updateHighlight(playerArr) {
+    for (const player of players) {
+      player.highlight = false;
+    }
+    for (let player of playerArr) {
+      player.highlight = true;
+    }
+    $GameAutoProcess++; // Update card... forcibly.
   }
   function comparePlayers(a, b) {
     if (a.weaponEnhance > b.weaponEnhance) {
@@ -169,8 +190,13 @@
 </label>
 <br>
 <div class="btn btn-md btn-primary" on:click={() => {
-  isGameStarted = true;
-  $GameState = GameLifeCycle.Started;
+  (async () => {
+    GameLog = [];
+    GameLog.push('게임이 시작되었습니다.');
+    await tick();
+    isGameStarted = true;
+    $GameState = GameLifeCycle.Started;
+  })();
 }}>
 <h5>
 게임 시작!
@@ -189,16 +215,19 @@
       isAllGameOvered = false;
       isGameStarted = true;
       isRematch = false;
-      $GameState = GameLifeCycle.NotStarted;
-      $GameAutoProcess = 0;
       // To rematch: Add enhanceDurability!
       winnerPlayers = winnerPlayers.map(player => {
         player.enhanceDurability += 1;
         player.gameOver = false;
         return player;
       });
+      $GameState = GameLifeCycle.NotStarted;
+      $GameAutoProcess = 0;
       players = winnerPlayers;
       await tick();
+      GameLog = [];
+      GameLog.push('동점자 리매치가 시작되었습니다.');
+      GameLog = GameLog;
     })();
   }}>
   <h2>동점자 리매치</h2>
@@ -211,6 +240,7 @@
     isRematch = false;
     $GameState = GameLifeCycle.NotStarted;
     $GameAutoProcess = 0;
+    GameLog = [];
     // To reset
     updatePlayerNum(playerNum);
     assignCharAccordingToGameMode(gameMode);
@@ -224,6 +254,8 @@
   <div class="btn btn-lg btn-info" on:click={() => {
     (async () => {
       while (!isAllGameOvered) {
+        GameLog.push(`------------ 자동진행 턴 #${$GameAutoProcess + 1} ------------`);
+        GameLog = GameLog;
         $GameAutoProcess += 1;
         await tick();
         await timeout(1000);
@@ -237,9 +269,12 @@
 </div>
 <div class="cardArea">
   {#each players as player (player.uid)}
-  <PlayerCard playerInfo={player} isGameStarted={isGameStarted} handleGameOver={handleGameOver} gameMode={gameMode} forceChar={forceChar} />
+  <PlayerCard playerInfo={player} isGameStarted={isGameStarted} handleGameOver={handleGameOver} gameMode={gameMode} forceChar={forceChar} {isAllGameOvered} GameLog={GameLog} />
   {/each}
 </div>
+{#if isGameStarted}
+<pre>{GameLog.join('\n')}</pre>
+{/if}
 
 <br><br>
 {#if !isGameStarted}

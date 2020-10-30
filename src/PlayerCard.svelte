@@ -19,6 +19,9 @@
     highlight: false,
     gameOver: false,
   };
+  let highlight = false;
+  export let GameLog = [];
+  export let isAllGameOvered = false;
   export let handleGameOver = () => {
     // do nothing on default
   };
@@ -46,8 +49,13 @@
     }
   });
   GameAutoProcess.subscribe((value) => {
-    if (isGameStarted) {
+    if (isGameStarted && value > 0) {
       handleEnhancement();
+    }
+    if (playerInfo.gameOver) {
+      highlight = playerInfo.highlight;
+    } else {
+      highlight = false;
     }
   });
   function startGame() {
@@ -77,6 +85,7 @@
       playerInfo.enhanceWarranty = 0;
       stepSuccessProb = 1;
     }
+    GameLog.push(`${playerInfo.name}의 캐릭터는 ${CharTypes[playerInfo.charType].name}입니다.`);
   }
   function endGame() {
     // ToDO
@@ -90,39 +99,57 @@
       playerInfo.weaponEnhance < playerInfo.enhanceWarranty || // 강화 보장 구간이거나
       randomRange(1, 100) <= stepSuccessProb * 100
     ) {
+      if (playerInfo.weaponEnhance < playerInfo.enhanceWarranty) {
+        GameLog.push(`${playerInfo.name}, 강화 보장 구간이기 때문에 강화에 성공 하였습니다! 강화도 +1!`);
+      } else {
+        GameLog.push(`${playerInfo.name}, ${Math.round(stepSuccessProb * 100)}%의 확률을 뚫고 강화에 성공 하였습니다! 강화도 +1!`);
+      }
       // 태성 전용: 50% 확률로 대성공
       if (playerInfo.charType === 3 && randomRange(1, 100) <= 50) {
         recentState = EnhanceState.BigSuccess;
         playerInfo.weaponEnhance += 2; // 강화 수치 추가 Up
+        GameLog.push(`   - 예리한 태성은 예리한 기운을 받아 성공을 대성공으로 만들었습니다! 강화도 +1 추가!`);
       } else if (playerInfo.charType === 5) {
         // 벤자민 전용: 성공시 강화도 감소
         recentState = EnhanceState.Success;
         playerInfo.weaponEnhance--; // 강화 수치 Down
         if (playerInfo.weaponEnhance < 0) playerInfo.weaponEnhance = 0; // 음수 방지..
+        GameLog.push(`   - 일 줄 알았지만, 벤자민의 강화는 거꾸로 갑니다! 강화도는 증가하지 않고 감소됩니다! 강화도 -1!`);
       } else {
         // 확률로 성공~!
         recentState = EnhanceState.Success;
         playerInfo.weaponEnhance++; // 강화 수치 Up
       }
+      GameLog.push(`   - 무기 강화도: +${playerInfo.weaponEnhance}`);
     } else {
       // 실패~!
-      recentState = EnhanceState.Failed;
       playerInfo.enhanceDurability -= 1; // 내구도 깎자~~
+      GameLog.push(`${playerInfo.name}, ${Math.round(stepSuccessProb * 100)}%의 확률을 뚫지 못하여 강화에 실패 하였습니다..`);
       if (randomRange(1, 100) <= 50) {
         if (playerInfo.weaponEnhance > 0) {
           recentState = EnhanceState.BigFailed;
+          GameLog.push(`   - 손이 미끄러져서 강화에 대실패 하였습니다! 강화도 -1!`);
           if (playerInfo.charType === 5) {
             // 벤자민 전용: 대실패시 강화도 증가
             playerInfo.weaponEnhance += 1; // 강화 수치 Up
+            GameLog.push(`   - 일 줄 알았지만, 벤자민의 강화는 거꾸로 갑니다! 강화도는 감소되지 않고 증가합니다! 강화도 +1!`);
           } else {
             playerInfo.weaponEnhance -= 1; // 50% 확률로 강화도 깎자~
             if (playerInfo.weaponEnhance < 0) playerInfo.weaponEnhance = 0; // 음수 방지.. (강보 때문에 이럴 일은 없긴 함)
           }
+          if (playerInfo.enhanceDurability !== 0) // 어차피 마지막이면 강화도 보여주니 이외의 경우에만 출력
+            GameLog.push(`   - 무기 강화도: +${playerInfo.weaponEnhance}`);
         }
+      } else {
+        recentState = EnhanceState.Failed;
       }
       if (playerInfo.enhanceDurability === 0) {
         // 강화 내구도 다 되었고 실패.. gameover...
         playerInfo.gameOver = true;
+        GameLog.push(`   - 내구도가 모두 소모되어 Game Over!`);
+        GameLog.push(`   - 최종 달성 무기 강화도: +${playerInfo.weaponEnhance}`);
+      } else {
+        GameLog.push(`   - 남은 무기 내구도: ${playerInfo.enhanceDurability}`);
       }
     }
 
@@ -157,6 +184,13 @@
     margin: 2px;
     width: 140px;
     text-align: center;
+  }
+  div.playerContainer[highlight="true"] {
+    border: 3px solid red;
+    opacity: 1 !important;
+  }
+  div.playerContainer[isAllGameOvered="true"] {
+    opacity: 0.5;
   }
   div.playerContainer[recentState="BigSuccess"] {
     background-color: cadetblue;
@@ -226,7 +260,9 @@
 <div
   bind:this={me}
   class="playerContainer"
+  highlight={highlight}
   {recentState}
+  isAllGameOvered={isAllGameOvered && isGameStarted}
   isAutoPlaying={$GameAutoProcess > 0 && isGameStarted && !playerInfo.gameOver}>
   {#if !isGameStarted}
     <input class="form-control" bind:value={playerInfo.name} />

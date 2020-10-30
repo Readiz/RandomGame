@@ -218,6 +218,7 @@
       // To rematch: Add enhanceDurability!
       winnerPlayers = winnerPlayers.map(player => {
         player.enhanceDurability += 1;
+        player.highlight = false;
         player.gameOver = false;
         return player;
       });

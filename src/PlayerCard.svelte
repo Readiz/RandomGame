@@ -3,6 +3,7 @@
     GameState,
     GameLifeCycle,
     GameAutoProcess,
+    GameSummary,
     CharTypes,
   } from "./store";
   import { randomRange } from './utils';
@@ -171,6 +172,7 @@
       handleGameOver();
     }
   })(playerInfo.gameOver);
+  $: $GameSummary[playerInfo.id] = playerInfo.weaponEnhance;
   let me;
 </script>
 

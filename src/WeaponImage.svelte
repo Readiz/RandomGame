@@ -68,6 +68,7 @@
 </style>
 
 <div>
+<!-- Image source: https://www.gdunlimited.net/resources/cat/rpg-maker-xp/icons/2/comments/desc/96 -->
 <img src={path} width={width} alt={desc} />
 </div>
 <br>

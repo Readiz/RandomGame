@@ -1,6 +1,7 @@
 <script>
   import { tick } from 'svelte';
   import PlayerCard from './PlayerCard.svelte';
+  import PlayerCardSimple from './PlayerCardSimple.svelte';
   import {GameState, GameLifeCycle, GameAutoProcess, CharTypes} from './store';
   import { randomRange } from './utils';
   let GameLog = [];
@@ -29,7 +30,7 @@
       players.push({
         uid: uid,
         id: i + 1,
-        name: '플레이어 #' + (i + 1),
+        name: '유저 #' + (i + 1),
         charType: 0,
         enhanceDurability: 3,
         enhanceWarranty: 3,
@@ -206,6 +207,14 @@
 
 
 <div class="resultArea">
+{#if isGameStarted}
+<div class="cardArea">
+  {#each players as player (player.uid)}
+  <PlayerCardSimple playerInfo={player} isGameStarted={isGameStarted} handleGameOver={handleGameOver} gameMode={gameMode} forceChar={forceChar} {isAllGameOvered} GameLog={GameLog} />
+  {/each}
+</div>
+{/if}
+
   {#if isAllGameOvered}
   {@html resultText}
   <br><br>
@@ -268,6 +277,7 @@
   <hr>
   {/if}
 </div>
+<div style="clear:both;"></div>
 <div class="cardArea">
   {#each players as player (player.uid)}
   <PlayerCard playerInfo={player} isGameStarted={isGameStarted} handleGameOver={handleGameOver} gameMode={gameMode} forceChar={forceChar} {isAllGameOvered} GameLog={GameLog} />
@@ -297,7 +307,7 @@
   {/each}
 </ul>
 
-<b>Ver.</b> 2020/10/29<br>
+<b>Ver.</b> 2020/12/21<br>
 <b>Made by</b> Readiz<br>
-<b>Special Thanks to</b> HG
+<b>Special Thanks to</b> HG, Lim
 {/if}

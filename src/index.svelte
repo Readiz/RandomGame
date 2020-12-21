@@ -213,6 +213,7 @@
   <PlayerCardSimple playerInfo={player} isGameStarted={isGameStarted} handleGameOver={handleGameOver} gameMode={gameMode} forceChar={forceChar} {isAllGameOvered} GameLog={GameLog} />
   {/each}
 </div>
+<div style="clear:both;"></div>
 {/if}
 
   {#if isAllGameOvered}
@@ -277,7 +278,6 @@
   <hr>
   {/if}
 </div>
-<div style="clear:both;"></div>
 <div class="cardArea">
   {#each players as player (player.uid)}
   <PlayerCard playerInfo={player} isGameStarted={isGameStarted} handleGameOver={handleGameOver} gameMode={gameMode} forceChar={forceChar} {isAllGameOvered} GameLog={GameLog} />

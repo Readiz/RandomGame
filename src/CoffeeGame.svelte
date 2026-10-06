@@ -132,6 +132,23 @@
   $: markers = participants.map((p) =>
     fingerMarker(p, width, height, orbitTime),
   );
+  $: winnerMarker = markers.find((p) => p.id === winner?.id);
+  // Keep the result centered on the same finger marker, even near an edge.
+  $: resultSize = winnerMarker
+    ? Math.min(
+        224,
+        width * 0.52,
+        height * 0.52,
+        2 *
+          (Math.min(
+            winnerMarker.x,
+            width - winnerMarker.x,
+            winnerMarker.y,
+            height - winnerMarker.y,
+          ) -
+            8),
+      )
+    : 0;
   $: connections = battle
     ? actors.map((actor) =>
         connection(
@@ -168,7 +185,9 @@
       if (typeof window.ReadizHaptics?.postMessage === "function") {
         window.ReadizHaptics.postMessage(JSON.stringify(pattern));
       } else if (typeof navigator.vibrate === "function")
-        navigator.vibrate(pattern);
+        navigator.vibrate(
+          pattern === "result" ? [180, 70, 200, 70, 200] : pattern,
+        );
     } catch {
       // Optional device feedback must never interrupt a round.
     }
@@ -302,7 +321,7 @@
     if (fightTime >= timeline.end) {
       clips = [];
       phase = "result";
-      vibrate([60, 55, 100]);
+      vibrate("result");
     }
   }
 
@@ -563,7 +582,7 @@
   data-beat={beat}
   data-turn={battle?.turn ?? 0}
   data-active-attacks={clips.length}
-  style={`--winner-color:${winner ? COLORS[winner.colorIndex].hex : "#101114"}`}
+  style={`--winner-color:${winner ? COLORS[winner.colorIndex].hex : "#101114"};--result-size:${resultSize}px`}
 >
   <div
     class="arena"
@@ -640,6 +659,12 @@
         data-anchor-id={participant.id}
         aria-hidden="true"
       >
+        {#if phase === "result" && winner.id === participant.id}
+          <svg class="result-target" viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="39.5" stroke-width="21" />
+            <circle cx="50" cy="50" r="22" stroke-width="5" />
+          </svg>
+        {/if}
         <span class="finger-orbit">
           {#each participant.numbers as number, index}
             <span
@@ -715,16 +740,18 @@
   </div>
   <p class="sr-only" aria-live="polite" aria-atomic="true">{announcement}</p>
   {#if phase === "result"}
-    <div class="result" style={`color:${COLORS[winner.colorIndex].hex}`}>
-      <span>{winner.id}번</span> 오늘 커피 당첨
+    <div class="result-controls" class:at-top={winnerMarker.y >= height / 2}>
+      <div class="result">
+        <span>{winner.id}번</span> 오늘 커피 당첨
+      </div>
+      <button
+        class="replay"
+        bind:this={resultButton}
+        onclick={() => {
+          reset();
+          arena.focus({ preventScroll: true });
+        }}>한 판 더</button
+      >
     </div>
-    <button
-      class="replay"
-      bind:this={resultButton}
-      onclick={() => {
-        reset();
-        arena.focus({ preventScroll: true });
-      }}>한 판 더</button
-    >
   {/if}
 </main>

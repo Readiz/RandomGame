@@ -58,13 +58,17 @@ button:focus-visible,
   background: radial-gradient(ellipse at 50% 50%, #b66d4820, transparent 70%);
   opacity: 1;
 }
-.game.finished:before {
-  background: radial-gradient(
-    ellipse at 50% 50%,
-    color-mix(in srgb, var(--winner-color) 8%, transparent),
-    transparent 80%
-  );
-  opacity: 1;
+.game.finished {
+  background: var(--winner-color);
+  color: #0c0d0f;
+}
+.game.finished:before,
+.finished .battle-ground,
+.finished .connections,
+.finished .fighter,
+.finished .finger:not(.chosen),
+.finished .finger-orbit {
+  display: none;
 }
 .arena {
   position: absolute;
@@ -125,9 +129,6 @@ button:focus-visible,
   background: radial-gradient(ellipse, #ffffff04, transparent 70%);
   pointer-events: none;
   transition: opacity 0.7s;
-}
-.finished .battle-ground {
-  opacity: 0.2;
 }
 .duel-word {
   position: absolute;
@@ -212,13 +213,20 @@ button:focus-visible,
   opacity: 0.18;
 }
 .finger.chosen {
+  width: var(--result-size);
+  height: var(--result-size);
   opacity: 1;
-  border-width: 2px;
-  border-color: var(--player-color);
-  box-shadow: 0 0 65px color-mix(in srgb, var(--player-color) 18%, transparent);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #0c0d0f;
+  animation: result-stamp 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.finger.chosen .finger-orbit {
-  inset: -2px;
+.result-target {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
 }
 .fighter {
   position: absolute;
@@ -251,11 +259,6 @@ button:focus-visible,
 .fallen {
   pointer-events: none;
 }
-.winner {
-  filter: drop-shadow(
-    0 0 10px color-mix(in srgb, var(--player-color) 22%, transparent)
-  );
-}
 .hit-word {
   position: absolute;
   left: 50%;
@@ -285,43 +288,55 @@ button:focus-visible,
   border-color: #ffb278;
   filter: drop-shadow(0 0 7px #ff9742);
 }
-.result {
+.result-controls {
   position: absolute;
-  top: max(10vh, calc(env(safe-area-inset-top) + 35px));
-  left: 0;
-  width: 100%;
-  text-align: center;
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.8px;
+  bottom: max(28px, calc(env(safe-area-inset-bottom) + 16px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(calc(100% - 48px), 360px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  z-index: 6;
   pointer-events: none;
-  animation: result-in 0.5s ease-out both;
+  animation: result-in 0.3s ease-out both;
+}
+.result-controls.at-top {
+  top: max(28px, calc(env(safe-area-inset-top) + 16px));
+  bottom: auto;
+}
+.result {
+  font-size: 13px;
+  font-weight: 550;
+  letter-spacing: -0.5px;
 }
 .result > span {
   display: block;
-  margin-bottom: 7px;
-  font-size: 12px;
-  letter-spacing: 2px;
-  font-weight: 500;
-  opacity: 0.7;
+  margin-bottom: 3px;
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -1px;
 }
 .replay {
-  position: absolute;
-  bottom: max(28px, env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 6;
-  border: 1px solid #ffffff20;
-  background: #181a1ee8;
-  color: #d9ddd9;
+  border: 0;
+  background: #0c0d0f;
+  color: var(--winner-color);
   padding: 13px 26px;
   border-radius: 50px;
   font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+  pointer-events: auto;
   cursor: pointer;
-  backdrop-filter: blur(10px);
 }
 .replay:hover {
-  border-color: #ffffff50;
+  background: #24262b;
+}
+.replay:focus-visible {
+  outline: 2px solid #0c0d0f;
+  outline-offset: 4px;
 }
 .sr-only {
   position: absolute;
@@ -363,13 +378,18 @@ button:focus-visible,
     opacity: 1;
   }
 }
+@keyframes result-stamp {
+  from {
+    scale: 0.72;
+  }
+  to {
+    scale: 1;
+  }
+}
 @media (max-width: 360px) {
   .fighter {
     width: 48px;
     height: 57px;
-  }
-  .result {
-    font-size: 18px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

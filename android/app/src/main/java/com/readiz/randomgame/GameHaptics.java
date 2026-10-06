@@ -29,7 +29,9 @@ final class GameHaptics {
     }
 
     void play(String raw) {
-        long[] pattern = parsePattern(raw);
+        // A named, fixed result cue is the only request allowed to use full amplitude.
+        boolean result = "\"result\"".equals(raw);
+        long[] pattern = result ? new long[]{0, 180, 70, 200, 70, 200} : parsePattern(raw);
         if (pattern == null || vibrator == null) return;
         if (pattern.length == 0) { cancel(); return; }
         if (!active || !vibrator.hasVibrator()
@@ -38,9 +40,12 @@ final class GameHaptics {
             AudioAttributes attributes = new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build();
-            if (Build.VERSION.SDK_INT >= 26)
-                vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1), attributes);
-            else vibrator.vibrate(pattern, -1, attributes);
+            if (Build.VERSION.SDK_INT >= 26) {
+                VibrationEffect effect = result
+                        ? VibrationEffect.createWaveform(pattern, new int[]{0, 255, 0, 255, 0, 255}, -1)
+                        : VibrationEffect.createWaveform(pattern, -1);
+                vibrator.vibrate(effect, attributes);
+            } else vibrator.vibrate(pattern, -1, attributes);
         } catch (IllegalArgumentException | SecurityException ignored) { }
     }
 

@@ -1,8 +1,11 @@
 <script>
   import { onMount } from "svelte";
   import Fighter from "./Fighter.svelte";
+  import AttackEffect from "./AttackEffect.svelte";
   import {
     COLORS,
+    HEROES,
+    chooseHero,
     MAX_PLAYERS,
     MAX_HEALTH,
     MARCH_MS,
@@ -41,6 +44,8 @@
   $: winner = battle?.players.find((p) => p.id === battle.winnerId);
   $: duel = phase === "fight" && alive.length === 2;
   $: rendered = [...actors].sort((a, b) => a.y - b.y);
+  $: striker = actors.find((p) => p.id === attack?.attackerId);
+  $: victim = actors.find((p) => p.id === attack?.targetId);
   $: announcement =
     phase === "result"
       ? `${winner.id}번 ${COLORS[winner.colorIndex].name}, 마지막 생존자. 오늘 커피 당첨!`
@@ -58,8 +63,8 @@
 
   const clamp = (value, min, max) => Math.max(min, Math.min(value, max));
   const anchorPoint = (p, areaWidth = width, areaHeight = height) => ({
-    x: clamp(p.x, 58, areaWidth - 58),
-    y: clamp(p.y, 58, areaHeight - 58),
+    x: clamp(p.x, 73, areaWidth - 73),
+    y: clamp(p.y, 73, areaHeight - 73),
   });
   // The sprite's head points up at zero degrees. Its center sits under the touch.
   const heading = (
@@ -76,18 +81,24 @@
     const anchor = anchorPoint(participant, areaWidth, areaHeight);
     const orbit =
       ((elapsed / 6000 + participant.colorIndex / 10) % 1) * Math.PI * 2;
-    const numberX = Math.sin(orbit) * 42;
-    const numberY = -Math.cos(orbit) * 42;
+    const numbers = [0, 1, 2].map((index) => {
+      const angle = orbit + (index * Math.PI * 2) / 3;
+      const x = Math.sin(angle) * 56;
+      const y = -Math.cos(angle) * 56;
+      return {
+        x,
+        y,
+        angle: heading(
+          { x: anchor.x + x, y: anchor.y + y },
+          areaWidth,
+          areaHeight,
+        ),
+      };
+    });
     return {
       ...participant,
       ...anchor,
-      numberX,
-      numberY,
-      numberAngle: heading(
-        { x: anchor.x + numberX, y: anchor.y + numberY },
-        areaWidth,
-        areaHeight,
-      ),
+      numbers,
     };
   }
   function connection(actor, participant, areaWidth, areaHeight) {
@@ -140,10 +151,12 @@
     if (!paused) arm();
   }
   function vibrate(pattern) {
-    if (typeof navigator.vibrate !== "function") return;
     if (pattern !== 0 && (reducedMotion || paused || document.hidden)) return;
     try {
-      navigator.vibrate(pattern);
+      if (typeof window.ReadizHaptics?.postMessage === "function") {
+        window.ReadizHaptics.postMessage(JSON.stringify(pattern));
+      } else if (typeof navigator.vibrate === "function")
+        navigator.vibrate(pattern);
     } catch {
       // Optional device feedback must never interrupt a round.
     }
@@ -240,7 +253,14 @@
     const colorIndex = COLORS.findIndex((_, i) => !used.has(i));
     participants = [
       ...participants,
-      { id: colorIndex + 1, colorIndex, pointerId, x, y },
+      {
+        id: colorIndex + 1,
+        colorIndex,
+        heroId: chooseHero(participants),
+        pointerId,
+        x,
+        y,
+      },
     ];
     vibrate(12);
     beginCountdown();
@@ -370,7 +390,12 @@
             goal = { x: goal.x - ux * 7, y: goal.y - uy * 7 };
           } else if (beat === "dash" || beat === "impact") {
             pose = "swing";
-            goal = { x: targetHome.x - ux * 29, y: targetHome.y - uy * 18 };
+            const reach =
+              HEROES.find((hero) => hero.id === actor.heroId)?.reach ?? 29;
+            goal = {
+              x: targetHome.x - ux * reach,
+              y: targetHome.y - uy * reach,
+            };
           }
         } else if (actor.id === attack?.targetId && attackerHome) {
           if (beat === "impact") {
@@ -409,8 +434,11 @@
     updatePreference();
     preference.addEventListener("change", updatePreference);
     raf = requestAnimationFrame(animate);
+    let appHidden = false;
     const visibility = () => {
-      paused = document.hidden;
+      const hidden = document.hidden || appHidden;
+      if (hidden === paused) return;
+      paused = hidden;
       if (paused) {
         vibrate(0);
         pauseStarted = performance.now();
@@ -427,7 +455,12 @@
     const blur = () => {
       if (!battle) reset();
     };
+    const appVisibility = (event) => {
+      appHidden = event.detail?.hidden === true;
+      visibility();
+    };
     document.addEventListener("visibilitychange", visibility);
+    window.addEventListener("readiz-app-visibility", appVisibility);
     window.addEventListener("blur", blur);
     return () => {
       stopTimer();
@@ -435,6 +468,7 @@
       cancelAnimationFrame(raf);
       preference.removeEventListener("change", updatePreference);
       document.removeEventListener("visibilitychange", visibility);
+      window.removeEventListener("readiz-app-visibility", appVisibility);
       window.removeEventListener("blur", blur);
     };
   });
@@ -509,6 +543,14 @@
             visibility={link.visible ? "visible" : "hidden"}
           />
         {/each}
+        {#if phase === "fight" && beat === "impact" && !battle.lastHit.dodged && striker && victim}
+          {#key battle.turn}<AttackEffect
+              from={striker}
+              to={victim}
+              heroId={striker.heroId}
+              critical={battle.lastHit.critical}
+            />{/key}
+        {/if}
       </svg>
     {/if}
 
@@ -516,16 +558,24 @@
       <div
         class="finger"
         class:away={!!battle}
+        class:eliminated={battle?.players.find((p) => p.id === participant.id)
+          ?.health === 0}
         class:chosen={phase === "result" && winner.id === participant.id}
-        style={`--player-color:${COLORS[participant.colorIndex].hex};left:${participant.x}px;top:${participant.y}px;--number-x:${participant.numberX}px;--number-y:${participant.numberY}px;--number-angle:${participant.numberAngle}deg`}
+        style={`--player-color:${COLORS[participant.colorIndex].hex};left:${participant.x}px;top:${participant.y}px`}
         data-anchor-id={participant.id}
         aria-hidden="true"
       >
-        <span class="finger-orbit"
-          ><span class="orbit-number" data-angle={participant.numberAngle}
-            >{participant.id}</span
-          ></span
-        >
+        <span class="finger-orbit">
+          {#each participant.numbers as number, index}
+            <span
+              class="orbit-number"
+              data-orbit-index={index}
+              data-angle={number.angle}
+              style={`--number-x:${number.x}px;--number-y:${number.y}px;--number-angle:${number.angle}deg`}
+              >{participant.id}</span
+            >
+          {/each}
+        </span>
       </div>
     {/each}
 
@@ -541,6 +591,7 @@
         data-x={actor.x}
         data-y={actor.y}
         data-angle={actor.angle}
+        data-hero={actor.heroId}
         aria-hidden="true"
       >
         {#if phase === "fight" && actor.health > 0}
@@ -554,12 +605,12 @@
           color={COLORS[actor.colorIndex].hex}
           pose={actor.pose}
           number={actor.id}
+          heroId={actor.heroId}
         />
         {#if phase === "fight" && beat === "impact" && battle.lastHit.targetId === actor.id}
           {#key battle.turn}
             {#if battle.lastHit.dodged}<span class="hit-word">회피</span>
-            {:else}<span class="slash" class:critical={battle.lastHit.critical}
-              ></span>{/if}
+            {/if}
           {/key}
         {/if}
       </div>

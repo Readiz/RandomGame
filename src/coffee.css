@@ -34,6 +34,7 @@ button:focus-visible,
 .game {
   position: relative;
   width: 100%;
+  height: 100vh;
   height: 100svh;
   height: 100dvh;
   overflow: hidden;
@@ -167,9 +168,11 @@ button:focus-visible,
   width: 84px;
   height: 84px;
   transform: translate(-50%, -50%);
+  border: 1px solid var(--player-color);
   border: 1px solid color-mix(in srgb, var(--player-color) 55%, transparent);
   border-radius: 50%;
   color: var(--player-color);
+  background: #0c0d0f;
   background: color-mix(in srgb, var(--player-color) 5%, #0c0d0f);
   box-shadow: 0 0 28px color-mix(in srgb, var(--player-color) 6%, transparent);
   display: grid;
@@ -191,18 +194,21 @@ button:focus-visible,
   transform: translate(-50%, -50%) rotate(var(--number-angle));
   display: grid;
   place-items: center;
-  min-width: 20px;
-  height: 20px;
+  min-width: 22px;
+  height: 22px;
   padding: 0 3px;
   border-radius: 50%;
   background: #0c0d0f;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
 }
 .finger.away {
-  opacity: 0.42;
+  opacity: 0.65;
+}
+.finger.eliminated {
+  opacity: 0.18;
 }
 .finger.chosen {
   opacity: 1;

@@ -6,3 +6,11 @@ docs/index.html
 output/
 .playwright-cli/
 .DS_Store
+
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/local.properties
+/outputs/
+*.jks
+*.keystore

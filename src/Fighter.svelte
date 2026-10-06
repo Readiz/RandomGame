@@ -2,16 +2,20 @@
   export let color = "#d3f580";
   export let pose = "idle";
   export let number = 1;
+  export let heroId = "suit";
+  const suits = {
+    suit: { body: "#b84446", trim: "#efcb78", legs: "#b84446" },
+    shield: { body: "#4875ad", trim: "#e6edf2", legs: "#304e77" },
+    thunder: { body: "#708494", trim: "#d4e1e7", legs: "#485565" },
+    giant: { body: "#86bf65", trim: "#b8df83", legs: "#72508f" },
+    web: { body: "#d9575a", trim: "#f2eeee", legs: "#35648e" },
+    mage: { body: "#39768c", trim: "#efb867", legs: "#325060" },
+  };
+  $: suit = suits[heroId] ?? suits.suit;
 </script>
 
 <svg
-  class="knight"
-  class:walk={pose === "walk"}
-  class:windup={pose === "windup"}
-  class:swing={pose === "swing"}
-  class:hurt={pose === "hurt"}
-  class:down={pose === "down"}
-  class:win={pose === "win"}
+  class={`hero ${heroId} ${pose}`}
   viewBox="0 0 44 52"
   fill="none"
   aria-hidden="true"
@@ -20,78 +24,208 @@
     class="shadow"
     cx="22"
     cy="47"
-    rx="14"
+    rx={heroId === "giant" ? 17 : 14}
     ry="3"
     fill="#000"
     opacity=".5"
   />
   <g class="body">
-    <path
-      class="cape"
-      d="M13 22 8 43Q22 49 34 43L30 22Z"
-      fill={color}
-      opacity=".5"
-    />
-    <g class="leg left-leg"
-      ><path d="M16 33V43" stroke="#47515c" stroke-width="6" /><path
-        d="M13 43H20V47H11V45Z"
-        fill="#90969f"
-      /></g
-    >
-    <g class="leg right-leg"
-      ><path d="M27 33V43" stroke="#47515c" stroke-width="6" /><path
-        d="M24 43H31V47H23V45Z"
-        fill="#90969f"
-      /></g
-    >
-    <path d="M14 21H29L32 35 22 39 11 35Z" fill={color} />
-    <path
-      d="M13 22 10 30M29 22 33 29"
-      stroke="#9aa3ac"
-      stroke-width="6"
-      stroke-linecap="round"
-    />
-    <rect x="12" y="8" width="20" height="17" rx="7" fill="#e6c4a1" />
-    <path d="M10 16V10Q10 4 22 4T34 10V18H30V12H14V18H10Z" fill="#75838f" />
-    <path d="M15 6H29V10H15Z" fill={color} />
-    <path d="M18 4V1H26V5" fill={color} />
-    <rect x="13" y="14" width="18" height="7" rx="2" fill="#222b36" />
-    <path d="M17 16V19M26 16V19" stroke="#eaf7f8" stroke-width="2" />
-    <path d="M17 24H27" stroke="#a4b0b8" stroke-width="3" />
-    <g class="sword-arm">
+    {#if heroId === "thunder" || heroId === "mage"}
       <path
-        d="M31 25 35 29"
-        stroke="#b5bdc5"
-        stroke-width="5"
-        stroke-linecap="round"
+        class="cape"
+        d="M12 20 5 43Q22 52 38 43L32 20Z"
+        fill={heroId === "mage" ? "#a93c4c" : "#c45860"}
       />
-      <path d="M34 28 35 11 38 7 40 12 37 29Z" fill="#ecf1ec" />
-      <path d="M37 12 36 27" stroke="#9dbbc8" />
+    {/if}
+    <g class="leg left-leg">
       <path
-        d="M31 28 40 30"
-        stroke="#edc773"
-        stroke-width="3"
-        stroke-linecap="round"
+        d="M16 34V44"
+        stroke={suit.legs}
+        stroke-width={heroId === "giant" ? 8 : 6}
       />
-      <path d="M35 30 34 34" stroke="#8f6852" stroke-width="3" />
+      <path
+        d="M12 43H20V47H10V45Z"
+        fill={heroId === "giant" ? suit.body : suit.trim}
+      />
+    </g>
+    <g class="leg right-leg">
+      <path
+        d="M28 34V44"
+        stroke={suit.legs}
+        stroke-width={heroId === "giant" ? 8 : 6}
+      />
+      <path
+        d="M24 43H32V47H24Z"
+        fill={heroId === "giant" ? suit.body : suit.trim}
+      />
     </g>
     <path
-      d="M7 24 17 24 18 31Q16 37 12 39Q7 37 6 31Z"
-      fill={color}
-      stroke="#d6ddd9"
-      stroke-width="1.2"
+      d={heroId === "giant"
+        ? "M10 21H34L33 37H11Z"
+        : "M14 21H30L32 36 22 40 11 36Z"}
+      fill={suit.body}
+      stroke="#13202b"
+      stroke-width=".8"
     />
     <path
-      d="M12 26V35M9 30H15"
-      stroke="#17251d"
-      opacity=".4"
-      stroke-width="1.5"
+      d="M13 23 9 31"
+      stroke={suit.body}
+      stroke-width={heroId === "giant" ? 9 : 6}
+      stroke-linecap="round"
+    />
+    {#if heroId === "suit"}<path
+        d="M13 24 17 27M28 27 32 24M15 37H29"
+        stroke={suit.trim}
+        stroke-width="2"
+      />{/if}
+    {#if heroId === "web"}<path
+        d="M14 24 30 36M30 24 14 36M12 30H31"
+        stroke="#742f41"
+        stroke-width="1"
+      />{/if}
+    {#if heroId === "mage"}<path
+        d="M12 20 18 26M32 20 27 26M14 36H31"
+        stroke={suit.trim}
+        stroke-width="3"
+      />{/if}
+    {#if heroId === "thunder"}<circle
+        cx="14"
+        cy="24"
+        r="2.5"
+        fill={suit.trim}
+      /><circle cx="30" cy="24" r="2.5" fill={suit.trim} />{/if}
+
+    {#if heroId === "suit"}
+      <rect x="12" y="5" width="21" height="21" rx="7" fill={suit.body} />
+      <path
+        d="M15 10 18 8 22 11 27 8 30 10 29 21 25 24H19L15 20Z"
+        fill={suit.trim}
+      />
+      <path d="M16 15H21M25 15H29" stroke="#b8f7ff" stroke-width="2" />
+      <path d="M20 21H25" stroke="#624834" stroke-width="1.5" />
+    {:else if heroId === "shield"}
+      <rect x="12" y="7" width="21" height="19" rx="8" fill="#e9c5a0" />
+      <path d="M12 19V11Q12 3 23 4Q33 4 33 12V20L28 17H17Z" fill={suit.body} />
+      <path d="M16 15H20M25 15H29M22 7V11" stroke="#eef5f5" stroke-width="2" />
+    {:else if heroId === "thunder"}
+      <path d="M12 11Q22 1 32 11L34 28H10Z" fill="#d4b472" />
+      <rect x="14" y="10" width="17" height="16" rx="6" fill="#e7c9a5" />
+      <path d="M12 16V9Q23 2 32 9V16L25 12 22 15 18 12Z" fill={suit.trim} />
+      <path d="M12 10 6 5 9 17 13 19M32 10 38 5 35 17 31 19" fill="#b7cbd6" />
+      <path d="M17 18H20M25 18H28" stroke="#344452" stroke-width="1.6" />
+    {:else if heroId === "giant"}
+      <rect x="10" y="5" width="24" height="22" rx="6" fill={suit.body} />
+      <path
+        d="M10 13V7L16 3 22 5 29 3 34 8V13L28 10 25 12 18 10 14 13Z"
+        fill="#263b2a"
+      />
+      <path d="M14 16 19 18M30 16 25 18" stroke="#244529" stroke-width="2" />
+      <path d="M17 23H27" stroke="#dbe5bd" stroke-width="3" />
+    {:else if heroId === "web"}
+      <ellipse cx="22" cy="15" rx="10" ry="12" fill={suit.body} />
+      <path
+        d="M22 3V26M13 8 31 21M31 8 13 21M12 14H32M15 7Q22 14 29 7M13 21Q22 17 31 21"
+        stroke="#872f42"
+        stroke-width=".8"
+      />
+      <path
+        d="M14 12 21 16 18 20Q13 19 14 12M30 12 23 16 26 20Q31 19 30 12"
+        fill="#f4f8f6"
+        stroke="#222d43"
+        stroke-width="1"
+      />
+    {:else}
+      <rect x="13" y="7" width="20" height="20" rx="6" fill="#d9af8b" />
+      <path
+        d="M13 15V8L19 3 25 5 31 4 34 10 32 17 28 10 21 10 17 14Z"
+        fill="#28353e"
+      />
+      <path d="M14 10 17 7M30 10 31 7" stroke="#dae1db" stroke-width="2" />
+      <path
+        d="M17 17H20M26 17H29M19 24 23 26 27 23"
+        stroke="#28353e"
+        stroke-width="2"
+      />
+      <path d="M11 20 17 27 9 25ZM33 20 27 27 36 25Z" fill="#c95b69" />
+    {/if}
+
+    <g class="weapon">
+      <path
+        d="M31 24 35 29"
+        stroke={suit.body}
+        stroke-width={heroId === "giant" ? 9 : 6}
+        stroke-linecap="round"
+      />
+      {#if heroId === "suit"}
+        <circle class="charge" cx="37" cy="27" r="4" fill="#b7f7ff" />
+      {:else if heroId === "thunder"}
+        <path d="M36 14 35 32" stroke="#b89569" stroke-width="3" />
+        <path
+          d="M30 8H43V17H30Z"
+          fill="#d0e1eb"
+          stroke="#6c879c"
+          stroke-width="1.2"
+        />
+        <path d="M39 9 36 14 40 14" stroke="#fcfbdb" stroke-width="1.5" />
+      {:else if heroId === "giant"}
+        <rect
+          x="31"
+          y="23"
+          width="11"
+          height="11"
+          rx="4"
+          fill={suit.trim}
+          stroke="#426442"
+        />
+      {:else if heroId === "web"}
+        <path
+          d="M35 28 40 20M35 27 33 21"
+          stroke={suit.body}
+          stroke-width="2.5"
+          stroke-linecap="round"
+        />
+      {:else if heroId === "mage"}
+        <circle
+          class="charge"
+          cx="37"
+          cy="25"
+          r="6"
+          stroke="#ffc37b"
+          stroke-width="1.5"
+        />
+        <path
+          d="M37 19 42 28H32ZM37 31 32 22H42Z"
+          stroke="#ee9956"
+          stroke-width=".8"
+        />
+      {/if}
+    </g>
+    {#if heroId === "shield"}
+      <g class="shield"
+        ><circle cx="10" cy="31" r="10" fill="#be5361" /><circle
+          cx="10"
+          cy="31"
+          r="7"
+          fill="#e7ece8"
+        /><circle cx="10" cy="31" r="4.5" fill="#497eae" /><path
+          d="m10 27 1 3 3 1 -3 1 -1 3 -1 -3 -3 -1 3 -1Z"
+          fill="#eff5ec"
+        /></g
+      >
+    {/if}
+    <circle
+      cx="23"
+      cy="32"
+      r="6.3"
+      fill={color}
+      stroke="#18221ed9"
+      stroke-width=".8"
     />
     <text
       class="torso-number"
       class:double-digit={number >= 10}
-      x="23.5"
-      y="34"
+      x="23"
+      y="35.3"
       text-anchor="middle"
       fill="#152018">{number}</text
     >
@@ -99,7 +233,7 @@
 </svg>
 
 <style>
-  .knight {
+  .hero {
     display: block;
     width: 100%;
     height: 100%;
@@ -107,21 +241,21 @@
   }
   .torso-number {
     font:
-      900 10px system-ui,
+      900 9px system-ui,
       sans-serif;
     font-variant-numeric: tabular-nums;
   }
-  .torso-number.double-digit {
-    font-size: 8px;
-    letter-spacing: -0.7px;
+  .double-digit {
+    font-size: 7.5px;
+    letter-spacing: -0.5px;
   }
   .body {
-    transform-origin: 22px 43px;
+    transform-origin: 22px 38px;
   }
   .leg {
     transform-origin: 22px 34px;
   }
-  .sword-arm {
+  .weapon {
     transform-origin: 31px 25px;
   }
   .walk .body {
@@ -133,21 +267,35 @@
   .walk .right-leg {
     animation: step 0.2s infinite alternate-reverse;
   }
-  .windup .sword-arm {
-    transform: rotate(-48deg);
+  .windup .weapon {
+    transform: rotate(-28deg);
   }
-  .windup .body {
-    transform: rotate(-7deg);
+  .windup .charge {
+    filter: drop-shadow(0 0 4px #fff8c7);
   }
-  .swing .sword-arm {
-    transform: rotate(78deg);
+  .swing .weapon {
+    transform: rotate(55deg);
   }
-  .swing .body {
-    transform: rotate(10deg);
+  .suit.swing .weapon,
+  .mage.swing .weapon,
+  .web.swing .weapon {
+    transform: translate(3px, -3px);
+  }
+  .shield.swing .shield {
+    transform: translate(1px, -4px);
+  }
+  .giant.windup .body {
+    scale: 1.06;
+  }
+  .giant.swing .body {
+    translate: 0 2px;
+  }
+  .web.swing .body {
+    translate: 0 -5px;
   }
   .hurt .body {
     animation: hit 0.18s ease-out;
-    filter: brightness(1.6);
+    filter: brightness(1.5);
   }
   .down .body {
     transform: translate(4px, 7px) rotate(85deg);
@@ -159,8 +307,8 @@
   .win .body {
     animation: hop 0.6s ease-in-out infinite;
   }
-  .win .sword-arm {
-    transform: rotate(-130deg);
+  .win .weapon {
+    transform: rotate(-100deg);
   }
   @keyframes bob {
     from {
@@ -179,13 +327,11 @@
     }
   }
   @keyframes hit {
-    0% {
-      translate: 4px -1px;
-      rotate: 12deg;
+    from {
+      translate: 3px -1px;
     }
-    100% {
+    to {
       translate: 0 0;
-      rotate: 0deg;
     }
   }
   @keyframes hop {

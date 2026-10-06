@@ -1,6 +1,6 @@
 {
   "name": "random-game",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -13,7 +13,9 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --test tests/*.test.js",
-    "release:pages": "npm test && npm run build && node scripts/release-pages.js"
+    "release:pages": "npm test && npm run build && node scripts/release-pages.js",
+    "build:android:web": "vite build --config vite.android.config.js",
+    "build:apk": "bash scripts/build-apk.sh"
   },
   "dependencies": {
     "bootstrap": "4.6.2",

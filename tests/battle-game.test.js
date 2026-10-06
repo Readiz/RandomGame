@@ -7,6 +7,8 @@ import {
   resolveAttack,
   attackTiming,
   arenaSlots,
+  HEROES,
+  chooseHero,
 } from "../src/battle-game.js";
 const people = (count = 4) =>
   Array.from({ length: count }, (_, id) => ({ id, x: id * 80, y: id * 120 }));
@@ -107,6 +109,35 @@ test("finger positions and screen layout do not change combat or the winner", ()
   assert.equal(first.winnerId, moved.winnerId);
   assert.deepEqual(first.fallenIds, moved.fallenIds);
   assert.equal(first.turn, moved.turn);
+});
+
+test("hero abilities never change the winner, damage, or elimination order", () => {
+  for (let seed = 1; seed <= 24; seed++) {
+    const first = finish(
+      people(6).map((p, i) => ({ ...p, heroId: HEROES[i].id })),
+      seeded(seed),
+    );
+    const swapped = finish(
+      people(6).map((p, i) => ({ ...p, heroId: HEROES[5 - i].id })),
+      seeded(seed),
+    );
+    assert.equal(first.winnerId, swapped.winnerId);
+    assert.deepEqual(first.fallenIds, swapped.fallenIds);
+    assert.deepEqual(
+      first.players.map((p) => p.health),
+      swapped.players.map((p) => p.health),
+    );
+    assert.equal(first.turn, swapped.turn);
+  }
+});
+
+test("the first six participants receive distinct heroes and all ten remain valid", () => {
+  const participants = [];
+  const random = seeded(15);
+  for (let i = 0; i < 10; i++)
+    participants.push({ heroId: chooseHero(participants, random) });
+  assert.equal(new Set(participants.slice(0, 6).map((p) => p.heroId)).size, 6);
+  assert.ok(participants.every((p) => HEROES.some((h) => h.id === p.heroId)));
 });
 
 test("stale actions cannot double-apply a hit, and finished results are stable", () => {

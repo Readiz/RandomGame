@@ -1,0 +1,47 @@
+plugins { id 'com.android.application' }
+
+def webVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version
+def versionParts = webVersion.tokenize('.').collect { it as int }
+def signingDir = System.getenv('RANDOM_GAME_SIGNING_DIR') ?: "${System.properties['user.home']}/.config/random-game/android-signing"
+def passwordFile = file("${signingDir}/password")
+
+android {
+    namespace 'com.readiz.randomgame'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'com.readiz.randomgame'
+        minSdk 23
+        targetSdk 35
+        versionCode versionParts[0] * 1000000 + versionParts[1] * 1000 + versionParts[2]
+        versionName webVersion
+    }
+    signingConfigs {
+        release {
+            storeFile file("${signingDir}/release.jks")
+            storePassword passwordFile.exists() ? passwordFile.text.trim() : ''
+            keyAlias 'random-game'
+            keyPassword storePassword
+        }
+    }
+    buildTypes {
+        debug { applicationIdSuffix '.debug' }
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+        }
+    }
+    buildFeatures { buildConfig true }
+    sourceSets { main.assets.srcDirs = [layout.buildDirectory.dir('generated/assets')] }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    testOptions { unitTests.includeAndroidResources = true }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.14.0'
+    implementation 'androidx.core:core:1.13.0'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.17'
+}

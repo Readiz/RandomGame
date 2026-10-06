@@ -1,6 +1,23 @@
 export const MAX_PLAYERS = 10;
 export const MAX_HEALTH = 3;
 export const MARCH_MS = 1450;
+// Archetypes change presentation and reach, never the combat draw or damage.
+export const HEROES = [
+  { id: "suit", name: "파워슈트", reach: 68 },
+  { id: "shield", name: "방패 전사", reach: 27 },
+  { id: "thunder", name: "번개 전사", reach: 62 },
+  { id: "giant", name: "초록 거인", reach: 29 },
+  { id: "web", name: "거미 곡예사", reach: 42 },
+  { id: "mage", name: "마법사", reach: 82 },
+];
+
+export function chooseHero(participants, random = randomUnit) {
+  const unused = HEROES.filter(
+    (hero) => !participants.some((p) => p.heroId === hero.id),
+  );
+  const pool = unused.length ? unused : HEROES;
+  return pool[Math.floor(random() * pool.length)].id;
+}
 export const COLORS = [
   { name: "라임", hex: "#d3f580" },
   { name: "라벤더", hex: "#bfacff" },

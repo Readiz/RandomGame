@@ -1,128 +1,194 @@
 <script>
   import { onMount } from "svelte";
+  import Fighter from "./Fighter.svelte";
   import {
     COLORS,
     MAX_PLAYERS,
-    ROUND_MS,
-    SUCCESS_RATES,
-    createMatch,
-    advanceMatch,
-    placeCards,
-  } from "./coffee-game.js";
+    MAX_HEALTH,
+    MARCH_MS,
+    createBattle,
+    planAttack,
+    resolveAttack,
+    attackTiming,
+    arenaSlots,
+  } from "./battle-game.js";
 
-  let arena;
-  let width = 360;
-  let height = 440;
-  let participants = [];
-  let phase = "lobby";
-  let countdown = 3;
-  let match = null;
-  let countdownTimer;
-  let roundTimer;
-  let notice = "";
-  let demo = false;
-  let rulesOpen = false;
-  let rulesButton;
-  let rulesClose;
-  let resultButton;
+  let arena, resultButton;
+  let width = 360,
+    height = 700;
+  let participants = [],
+    actors = [];
+  let phase = "lobby",
+    beat = "idle",
+    countdown = 3;
+  let battle = null,
+    attack = null,
+    timing = null;
+  let paused = false,
+    reducedMotion = false;
+  let timer,
+    pendingAction,
+    deadline = 0,
+    remaining = 0;
+  let motionStarted = 0,
+    pauseStarted = 0;
+  let raf,
+    lastFrame = 0;
 
-  $: busy = phase === "playing" || phase === "tiebreak";
-  $: players = match
-    ? match.players
-    : participants.map((p) => ({
-        ...p,
-        level: 0,
-        status: "active",
-        event: "참여 완료",
-      }));
-  $: positioned = placeCards(players, width, height);
-  $: selected = match?.players.find((p) => p.id === match.selectedId);
+  $: playing = phase === "march" || phase === "fight";
+  $: alive = battle?.players.filter((p) => p.health > 0) ?? [];
+  $: winner = battle?.players.find((p) => p.id === battle.winnerId);
+  $: duel = phase === "fight" && alive.length === 2;
+  $: rendered = [...actors].sort((a, b) => a.y - b.y);
+  $: announcement =
+    phase === "result"
+      ? `${winner.id}번 ${COLORS[winner.colorIndex].name}, 마지막 생존자. 오늘 커피 당첨!`
+      : phase === "march"
+        ? "중앙으로 모이는 중. 손을 떼도 됩니다."
+        : phase === "fight"
+          ? `${alive.length}명 생존.${duel ? " 마지막 결투!" : ""}`
+          : phase === "countdown"
+            ? `${participants.length}명 참여. ${countdown}초 뒤 시작.`
+            : participants.length
+              ? "한 명 더 손가락을 올려주세요."
+              : "손가락을 올려요. 마지막 생존자가 커피를 삽니다.";
   $: if (phase === "result" && resultButton)
     resultButton.focus({ preventScroll: true });
-  $: if (rulesOpen && rulesClose) rulesClose.focus({ preventScroll: true });
 
-  function stopTimers() {
-    clearTimeout(countdownTimer);
-    clearTimeout(roundTimer);
+  const clamp = (value, min, max) => Math.max(min, Math.min(value, max));
+  const spawnPoint = (p) => ({
+    x: clamp(p.x, 32, width - 32),
+    y: clamp(p.y - 40, 84, height - 50),
+  });
+
+  function stopTimer() {
+    clearTimeout(timer);
+    pendingAction = null;
+  }
+  function arm() {
+    deadline = performance.now() + remaining;
+    timer = setTimeout(() => {
+      const action = pendingAction;
+      pendingAction = null;
+      action?.();
+    }, remaining);
+  }
+  function schedule(action, ms) {
+    clearTimeout(timer);
+    pendingAction = action;
+    remaining = ms;
+    if (!paused) arm();
+  }
+  function vibrate(pattern) {
+    if (!reducedMotion && navigator.vibrate) navigator.vibrate(pattern);
   }
 
-  function reset(message = "") {
-    stopTimers();
+  function reset() {
+    stopTimer();
     participants = [];
-    match = null;
+    actors = [];
+    battle = null;
+    attack = null;
     phase = "lobby";
+    beat = "idle";
     countdown = 3;
-    notice = message;
-    demo = false;
+  }
+
+  function syncLobby() {
+    actors = participants.map((p) => ({
+      ...p,
+      ...spawnPoint(p),
+      health: MAX_HEALTH,
+      pose: "idle",
+      facing: p.x < width / 2 ? 1 : -1,
+    }));
   }
 
   function beginCountdown() {
-    clearTimeout(countdownTimer);
+    stopTimer();
+    syncLobby();
     countdown = 3;
     phase = participants.length >= 2 ? "countdown" : "lobby";
     if (phase !== "countdown") return;
     function count() {
-      if (phase !== "countdown") return;
       countdown -= 1;
       if (countdown === 0) {
-        match = createMatch(participants);
-        phase = "playing";
-        notice = "";
-        scheduleRound();
-      } else countdownTimer = setTimeout(count, 1000);
+        battle = createBattle(participants);
+        phase = "march";
+        motionStarted = performance.now();
+        actors = actors.map((p) => ({ ...p, fromX: p.x, fromY: p.y }));
+        schedule(() => {
+          const slots = arenaSlots(battle.players, width, height);
+          actors = actors.map((p) => ({
+            ...p,
+            ...slots.find((s) => s.id === p.id),
+          }));
+          phase = "fight";
+          startAttack();
+        }, MARCH_MS);
+      } else {
+        vibrate(10);
+        schedule(count, 1000);
+      }
     }
-    countdownTimer = setTimeout(count, 1000);
+    schedule(count, 1000);
   }
 
-  function scheduleRound() {
-    clearTimeout(roundTimer);
-    roundTimer = setTimeout(() => {
-      if (!match || match.phase === "done") return;
-      match = advanceMatch(match);
-      phase = match.phase === "done" ? "result" : match.phase;
-      if (phase !== "result") scheduleRound();
-      else if (!demo && navigator.vibrate) navigator.vibrate([40, 60, 80]);
-    }, ROUND_MS);
+  function startAttack() {
+    attack = planAttack(battle);
+    timing = attackTiming(battle);
+    beat = "windup";
+    schedule(() => {
+      beat = "dash";
+      schedule(() => {
+        battle = resolveAttack(battle, attack);
+        beat = "impact";
+        if (!battle.lastHit.dodged)
+          vibrate(battle.lastHit.critical ? [18, 25, 35] : 12);
+        schedule(() => {
+          beat = "recover";
+          if (battle.phase === "done") {
+            schedule(() => {
+              phase = "result";
+              beat = "idle";
+              vibrate([35, 55, 70]);
+            }, 650);
+          } else schedule(startAttack, timing.recover);
+        }, timing.impact);
+      }, timing.dash);
+    }, timing.windup);
   }
 
   function addParticipant(x, y, pointerId = null) {
-    if (participants.length >= MAX_PLAYERS) {
-      notice = "최대 10명까지 함께할 수 있어요.";
-      return;
-    }
+    if (participants.length >= MAX_PLAYERS) return;
     const used = new Set(participants.map((p) => p.colorIndex));
     const colorIndex = COLORS.findIndex((_, i) => !used.has(i));
     participants = [
       ...participants,
-      { id: colorIndex + 1, pointerId, colorIndex, x, y },
+      { id: colorIndex + 1, colorIndex, pointerId, x, y },
     ];
-    notice = "";
+    vibrate(8);
     beginCountdown();
   }
-
   function point(event) {
     const bounds = arena.getBoundingClientRect();
     return {
-      x: Math.max(26, Math.min(width - 26, event.clientX - bounds.left)),
-      y: Math.max(26, Math.min(height - 26, event.clientY - bounds.top)),
+      x: clamp(event.clientX - bounds.left, 26, width - 26),
+      y: clamp(event.clientY - bounds.top, 26, height - 26),
     };
   }
-
   function pointerDown(event) {
     if (
-      rulesOpen ||
-      busy ||
+      playing ||
       phase === "result" ||
-      demo ||
       (event.pointerType === "mouse" && event.button !== 0)
     )
       return;
     event.preventDefault();
     const { x, y } = point(event);
     if (event.pointerType === "mouse") {
-      // A mouse cannot hold several pointers. Clicks register persistent spots.
       const nearby = participants.find(
-        (p) => Math.hypot(p.x - x, p.y - y) < 42,
+        (p) => Math.hypot(p.x - x, p.y - y) < 38,
       );
       if (nearby) {
         participants = participants.filter((p) => p.id !== nearby.id);
@@ -134,388 +200,268 @@
     arena.setPointerCapture(event.pointerId);
     addParticipant(x, y, event.pointerId);
   }
-
   function pointerMove(event) {
     if (!participants.some((p) => p.pointerId === event.pointerId)) return;
     const position = point(event);
     participants = participants.map((p) =>
       p.pointerId === event.pointerId ? { ...p, ...position } : p,
     );
-    if (match)
-      match = {
-        ...match,
-        players: match.players.map((p) =>
-          p.pointerId === event.pointerId ? { ...p, ...position } : p,
-        ),
-      };
+    if (!battle) syncLobby();
   }
-
   function pointerEnd(event) {
     if (!participants.some((p) => p.pointerId === event.pointerId)) return;
-    if (phase !== "lobby" && phase !== "countdown") {
+    if (battle)
       participants = participants.map((p) =>
         p.pointerId === event.pointerId ? { ...p, pointerId: null } : p,
       );
-      if (match)
-        match = {
-          ...match,
-          players: match.players.map((p) =>
-            p.pointerId === event.pointerId ? { ...p, pointerId: null } : p,
-          ),
-        };
+    else {
+      participants = participants.filter(
+        (p) => p.pointerId !== event.pointerId,
+      );
+      beginCountdown();
+    }
+  }
+  function keyboardJoin(event) {
+    if (event.key === "Escape") {
+      reset();
       return;
     }
-    participants = participants.filter((p) => p.pointerId !== event.pointerId);
-    beginCountdown();
-  }
-
-  function keyboardJoin(event) {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
-    if (busy || phase === "result" || demo || rulesOpen || event.repeat) return;
+    if (playing || phase === "result" || event.repeat) return;
     const index = participants.length;
     addParticipant(
-      width * (index % 2 ? 0.73 : 0.27),
-      height * (0.25 + Math.floor(index / 2) * 0.14),
+      width * (index % 2 ? 0.77 : 0.23),
+      height * (0.2 + Math.floor(index / 2) * 0.15),
     );
   }
 
-  function startDemo() {
-    reset();
-    demo = true;
-    [
-      [0.26, 0.38],
-      [0.74, 0.42],
-      [0.5, 0.76],
-    ].forEach(([x, y]) => addParticipant(width * x, height * y));
-  }
-
-  function closeRules() {
-    rulesOpen = false;
-    rulesButton?.focus();
-  }
-
-  function rulesKeys(event) {
-    if (event.key === "Escape") closeRules();
-    if (event.key === "Tab") {
-      event.preventDefault();
-      rulesClose?.focus();
+  function animate(now) {
+    const dt = Math.min(now - lastFrame || 16, 48);
+    lastFrame = now;
+    if (!paused && battle) {
+      const living = battle.players.filter((p) => p.health > 0);
+      // Keep a just-defeated target's slot until the current impact finishes.
+      const field =
+        phase === "fight" &&
+        (beat === "impact" || beat === "recover") &&
+        battle.lastHit?.fallen
+          ? battle.players.filter(
+              (p) => p.health > 0 || p.id === battle.lastHit.targetId,
+            )
+          : living;
+      const homes = arenaSlots(field, width, height);
+      const targetHome = homes.find((p) => p.id === attack?.targetId);
+      const attackerHome = homes.find((p) => p.id === attack?.attackerId);
+      const dx = targetHome && attackerHome ? targetHome.x - attackerHome.x : 0;
+      const dy = targetHome && attackerHome ? targetHome.y - attackerHome.y : 0;
+      const length = Math.hypot(dx, dy) || 1;
+      const ux = dx / length,
+        uy = dy / length;
+      actors = actors.map((actor) => {
+        const stats = battle.players.find((p) => p.id === actor.id);
+        let goal = homes.find((p) => p.id === actor.id) ?? actor;
+        let pose = "idle",
+          facing = actor.facing;
+        if (phase === "march") {
+          const progress = clamp((now - motionStarted) / MARCH_MS, 0, 1);
+          const eased = progress * progress * (3 - 2 * progress);
+          return {
+            ...actor,
+            ...stats,
+            x: actor.fromX + (goal.x - actor.fromX) * eased,
+            y: actor.fromY + (goal.y - actor.fromY) * eased,
+            pose: "walk",
+            facing: goal.x >= actor.fromX ? 1 : -1,
+          };
+        }
+        if (stats.health === 0) {
+          return { ...actor, health: 0, pose: "down" };
+        }
+        if (phase === "result") {
+          goal = spawnPoint(participants.find((p) => p.id === actor.id));
+          if (Math.abs(goal.x - actor.x) > 2)
+            facing = goal.x > actor.x ? 1 : -1;
+          pose =
+            Math.hypot(goal.x - actor.x, goal.y - actor.y) > 4 ? "walk" : "win";
+        } else if (actor.id === attack?.attackerId && targetHome) {
+          facing = dx >= 0 ? 1 : -1;
+          if (beat === "windup") {
+            pose = "windup";
+            goal = { x: goal.x - ux * 7, y: goal.y - uy * 7 };
+          } else if (beat === "dash" || beat === "impact") {
+            pose = "swing";
+            goal = { x: targetHome.x - ux * 29, y: targetHome.y - uy * 18 };
+          }
+        } else if (actor.id === attack?.targetId && attackerHome) {
+          facing = dx >= 0 ? -1 : 1;
+          if (beat === "impact") {
+            const dodged = battle.lastHit?.dodged;
+            goal = {
+              x: goal.x + (dodged ? -uy * 22 : ux * 15),
+              y: goal.y + (dodged ? ux * 22 : uy * 10),
+            };
+            pose = dodged ? "walk" : "hurt";
+          }
+        }
+        const blend = reducedMotion
+          ? 1
+          : 1 - Math.exp(-dt / (beat === "dash" ? 24 : 90));
+        const x = actor.x + (goal.x - actor.x) * blend,
+          y = actor.y + (goal.y - actor.y) * blend;
+        return { ...actor, health: stats.health, x, y, pose, facing };
+      });
     }
+    raf = requestAnimationFrame(animate);
   }
 
   onMount(() => {
+    const preference = matchMedia("(prefers-reduced-motion: reduce)");
+    const updatePreference = () => (reducedMotion = preference.matches);
+    updatePreference();
+    preference.addEventListener("change", updatePreference);
+    raf = requestAnimationFrame(animate);
     const visibility = () => {
-      if (document.hidden) {
-        stopTimers();
-        if (!match)
-          reset("화면을 벗어나 참여 대기를 취소했어요. 다시 올려주세요.");
-      } else if (match && match.phase !== "done") scheduleRound();
+      paused = document.hidden;
+      if (paused) {
+        pauseStarted = performance.now();
+        remaining = Math.max(0, deadline - pauseStarted);
+        clearTimeout(timer);
+        if (!battle) reset();
+      } else {
+        if (phase === "march")
+          motionStarted += performance.now() - pauseStarted;
+        lastFrame = performance.now();
+        if (pendingAction) arm();
+      }
     };
     const blur = () => {
-      if (phase === "lobby" || phase === "countdown")
-        reset("손가락을 다시 올려주세요.");
+      if (!battle) reset();
     };
     document.addEventListener("visibilitychange", visibility);
     window.addEventListener("blur", blur);
     return () => {
-      stopTimers();
+      stopTimer();
+      cancelAnimationFrame(raf);
+      preference.removeEventListener("change", updatePreference);
       document.removeEventListener("visibilitychange", visibility);
       window.removeEventListener("blur", blur);
     };
   });
 </script>
 
-<div class="app-shell">
-  <header class="app-header">
-    <a class="wordmark" href="./" aria-label="운빨망겜 처음으로"
-      ><span class="brand-symbol">✳</span> 운빨망겜<span class="edition"
-        >COFFEE EDITION</span
-      ></a
-    >
-    <button
-      class="icon-button"
-      aria-label="게임 방법"
-      bind:this={rulesButton}
-      disabled={participants.length > 0}
-      onclick={() => (rulesOpen = true)}>?</button
-    >
-  </header>
-
-  <main>
-    <section class="game-heading" aria-live="polite" aria-atomic="true">
-      <p class="eyebrow">
-        <span></span>
-        {demo ? "연습 게임 · 실제 내기 아니에요" : "점심 끝, 운빨 시작"}
-      </p>
-      {#if phase === "result"}
-        <h1>
-          {demo ? "이렇게 커피 주인공 결정!" : "오늘 커피는 내가 쏜다!"}
-          <span>☕</span>
-        </h1>
-        <p>
-          {match.lottery
-            ? "재강화도 동점! 남은 사람 중 무작위로 한 명을 골랐어요."
-            : "깨진 검의 주인공이 오늘의 바리스타."}
-        </p>
-      {:else if phase === "tiebreak"}
-        <h1>같이 깨졌다! <span>한 번 더.</span></h1>
-        <p>동시에 깨진 사람들끼리 자동으로 재강화해요.</p>
-      {:else if phase === "playing"}
-        <h1>제발, 내 검만은…</h1>
-        <p>이제 손을 떼도 돼요. 가장 먼저 깨지면 커피 당첨!</p>
-      {:else if phase === "countdown"}
-        <h1>다 모였나요? <span>{countdown}초!</span></h1>
-        <p>시작할 때까지 손가락을 그대로 올려두세요.</p>
-      {:else}
-        <h1>오늘 커피, <span>누가 살래?</span></h1>
-        <p>손가락만 올려요. 검은 알아서 강화할게요.</p>
-      {/if}
-    </section>
-
-    <div class="arena-wrap">
-      <div class="arena-topline" aria-hidden="true">
-        <span class:live={participants.length > 0}
-          ><i></i>{phase === "result"
-            ? "결과 발표"
-            : busy
-              ? "자동 강화 중"
-              : `${participants.length}명 참여 중`}</span
-        >
-        <span
-          >{phase === "tiebreak"
-            ? `재강화 ${match.tieRound + 1}`
-            : busy
-              ? `ROUND ${String(match.round + 1).padStart(2, "0")}`
-              : "가장 먼저 깨지면 ☕"}</span
-        >
+<main
+  class="game"
+  class:duel
+  class:paused
+  class:finished={phase === "result"}
+  data-phase={phase}
+  data-beat={beat}
+  data-turn={battle?.turn ?? 0}
+  style={`--winner-color:${winner ? COLORS[winner.colorIndex].hex : "#101114"}`}
+>
+  <div
+    class="arena"
+    bind:this={arena}
+    bind:clientWidth={width}
+    bind:clientHeight={height}
+    role="button"
+    aria-label={`커피내기 참여 공간. ${participants.length}명 참여 중. 손가락을 올리거나 클릭하세요. 키보드는 Enter로 참여합니다.`}
+    tabindex="0"
+    onpointerdown={pointerDown}
+    onpointermove={pointerMove}
+    onpointerup={pointerEnd}
+    onpointercancel={pointerEnd}
+    onlostpointercapture={pointerEnd}
+    onkeydown={keyboardJoin}
+    oncontextmenu={(event) => event.preventDefault()}
+  >
+    {#if !participants.length}
+      <div class="invitation" aria-hidden="true">
+        <p>손가락을 올려요</p>
+        <span>마지막까지 살아남으면 커피 ☕</span>
       </div>
+    {:else if phase === "lobby"}
+      <div class="invitation waiting" aria-hidden="true"><p>한 명 더</p></div>
+    {:else if phase === "countdown"}
+      <div class="countdown" aria-hidden="true">{countdown}</div>
+    {/if}
+    {#if playing || phase === "result"}<div
+        class="battle-ground"
+        aria-hidden="true"
+      ></div>{/if}
+    {#if duel && battle?.phase !== "done"}<div
+        class="duel-word"
+        aria-hidden="true"
+      >
+        결투
+      </div>{/if}
 
+    {#each participants as participant (participant.id)}
       <div
-        class="arena"
-        class:has-players={participants.length > 0}
-        class:is-result={phase === "result"}
-        bind:this={arena}
-        bind:clientWidth={width}
-        bind:clientHeight={height}
-        role="button"
-        aria-label={`커피내기 참여 공간. ${participants.length}명 참여 중. 손가락을 올리거나 클릭하세요. 키보드는 Enter로 참여합니다.`}
-        tabindex="0"
-        onpointerdown={pointerDown}
-        onpointermove={pointerMove}
-        onpointerup={pointerEnd}
-        onpointercancel={pointerEnd}
-        onlostpointercapture={pointerEnd}
-        onkeydown={keyboardJoin}
-        oncontextmenu={(e) => e.preventDefault()}
+        class="finger"
+        class:away={!!battle}
+        class:chosen={phase === "result" && winner.id === participant.id}
+        style={`--player-color:${COLORS[participant.colorIndex].hex};left:${participant.x}px;top:${participant.y}px`}
+        data-anchor-id={participant.id}
+        aria-hidden="true"
       >
-        {#if participants.length === 0}
-          <div class="empty-state" aria-hidden="true">
-            <div class="touch-illustration">
-              <span class="orbit orbit-one"></span><span class="orbit orbit-two"
-              ></span>
-              <span class="mini-sword">✦</span>
-              <svg viewBox="0 0 56 64" fill="none"
-                ><path
-                  d="M22 34V12a5 5 0 0 1 10 0v19-5a4.5 4.5 0 0 1 9 0v5-1a4.5 4.5 0 0 1 9 0v13c0 12-7 18-18 18-8 0-12-5-17-12L7 38c-3-5 3-10 7-6l8 8"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                /></svg
-              >
-              <span class="touch-dot dot-one"></span><span
-                class="touch-dot dot-two"
-              ></span>
-            </div>
-            <strong>여기에 손가락을 올려요</strong>
-            <p>
-              친구도 하나, 나도 하나.<br />2명 이상 모이면 자동으로 시작해요.
-            </p>
-            <span class="touch-hint">꾹 누르기 · 마우스는 한 명씩 클릭</span>
-          </div>
-        {:else if participants.length === 1}
-          <div class="waiting-note" aria-hidden="true">
-            좋아요! 한 명만 더 <span>↗</span>
-          </div>
-        {/if}
-
-        {#if phase === "countdown"}<div
-            class="countdown-number"
-            aria-hidden="true"
-          >
-            {countdown}
-          </div>{/if}
-
-        <svg class="connectors" {width} {height} aria-hidden="true">
-          {#each positioned as player (player.id)}
-            <line
-              x1={player.x}
-              y1={player.y}
-              x2={player.card.x + player.card.w / 2}
-              y2={player.card.y + player.card.h / 2}
-              stroke={COLORS[player.colorIndex].hex}
-              opacity={player.status === "safe" ? 0.1 : 0.25}
-              stroke-dasharray="3 5"
-            />
-          {/each}
-        </svg>
-
-        {#each positioned as player (player.id)}
-          <div
-            class="finger"
-            class:chosen={player.status === "selected"}
-            class:safe={player.status === "safe"}
-            style={`--player-color:${COLORS[player.colorIndex].hex};left:${player.x}px;top:${player.y}px`}
-            data-player-id={player.id}
-            data-status={player.status}
-            aria-hidden="true"
-          >
-            <span
-              >{player.status === "selected"
-                ? "☕"
-                : player.status === "safe"
-                  ? "✓"
-                  : player.id}</span
-            >
-          </div>
-          <div
-            class="sword-popup"
-            class:safe={player.status === "safe"}
-            class:chosen={player.status === "selected"}
-            style={`--player-color:${COLORS[player.colorIndex].hex};left:${player.card.x}px;top:${player.card.y}px;width:${player.card.w}px`}
-            data-card-id={player.id}
-          >
-            <div class="popup-label">
-              <span
-                >{String(player.id).padStart(2, "0")}
-                {COLORS[player.colorIndex].name}</span
-              ><i></i>
-            </div>
-            {#key `${match?.round ?? 0}-${match?.tieRound ?? 0}`}
-              <div class="weapon-row" class:enhancing={busy}>
-                <img
-                  src={`./${Math.min(player.level, 11)}.png`}
-                  alt=""
-                  class:cracked={player.status === "selected"}
-                /><strong>+{player.level}</strong>
-              </div>
-            {/key}
-            <span class="popup-event">{player.event}</span>
-          </div>
-        {/each}
-      </div>
-
-      <div class="arena-bottomline" aria-live="polite">
-        {#if notice}<span>{notice}</span>
-        {:else if phase === "result"}<span
-            >{selected.id}번 {COLORS[selected.colorIndex].name} 당첨 · 총 {participants.length}명
-            참여</span
-          >
-        {:else if phase === "tiebreak"}<span
-            >동점자 {players.filter((p) => p.status === "active").length}명 ·
-            재강화도 같은 확률로</span
-          >
-        {:else if busy}<span
-            >다음 강화 성공률 <b
-              >{Math.round((SUCCESS_RATES[match.round] ?? 0) * 100)}%</b
-            > <span class="separator">/</span> 모두 같은 조건</span
-          >
-        {:else}<span
-            >설정 없이 바로 <span class="separator">/</span> 2–10명
-            <span class="separator">/</span> 약 10초</span
-          >{/if}
-      </div>
-    </div>
-
-    <footer class="game-footer">
-      {#if phase === "result"}
-        <div
-          class="result-strip"
-          style={`--player-color:${COLORS[selected.colorIndex].hex}`}
+        <span
+          >{phase === "result" && winner.id === participant.id
+            ? "☕"
+            : participant.id}</span
         >
-          <span class="result-dot">{selected.id}</span>
-          <div>
-            <strong
-              >{COLORS[selected.colorIndex].name}, {demo
-                ? "커피 당첨 예시!"
-                : "커피 부탁해요!"}</strong
-            ><span
-              >{demo
-                ? "연습 끝! 친구들과 해볼까요?"
-                : "덕분에 오후도 힘내볼게요 ☕"}</span
-            >
-          </div>
-          <button
-            class="primary-button"
-            bind:this={resultButton}
-            onclick={() => {
-              reset();
-              arena.focus();
-            }}>한 판 더 <span>↗</span></button
-          >
-        </div>
-      {:else if participants.length > 0}
-        <div class="active-footer">
-          <p>
-            {demo
-              ? "연습 중이에요. 실제 내기에는 사용하지 마세요."
-              : busy
-                ? "운명은 정해지는 중. 잠깐만 기다려요."
-                : "다 같이 올리고, 시작할 때까지 꾹."}
-          </p>
-          <button class="text-button" onclick={() => reset()}
-            >다시 모으기 ↺</button
-          >
-        </div>
-      {:else}
-        <div class="idle-footer">
-          <span>실력 말고, 오늘의 운으로.</span><button
-            class="demo-button"
-            onclick={startDemo}>혼자 미리 해보기 <span>↗</span></button
-          >
-        </div>
-      {/if}
-    </footer>
-  </main>
-  <div class="page-footer">
-    <span>MADE BY READIZ <span class="version">v2.0</span></span><a
-      href="./classic.html">기존 강화 게임 ↗</a
-    >
-  </div>
-</div>
+      </div>
+    {/each}
 
-{#if rulesOpen}
-  <div class="modal-backdrop" role="presentation">
-    <div
-      class="rules-dialog"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="rules-title"
-      tabindex="-1"
-      onkeydown={rulesKeys}
-    >
-      <p class="eyebrow">HOW TO PLAY</p>
-      <h2 id="rules-title">손가락 하나면 준비 끝.</h2>
-      <ol>
-        <li>친구들과 이 화면에 손가락을 올려요.</li>
-        <li>2명 이상 모인 뒤 3초가 지나면 자동 시작!</li>
-        <li>검이 가장 먼저 깨진 한 명이 커피를 사요.</li>
-      </ol>
-      <p>
-        모두 같은 검, 같은 확률로 강화해요. 동시에 깨지면 해당 사람들끼리 최대
-        3번 재강화하고, 그래도 같으면 남은 사람 중 무작위로 한 명을 골라요.
-      </p>
-      <p>
-        시작 전 손을 떼면 참여가 취소돼요. 시작 후에는 손을 떼도 결과가
-        유지돼요. 화면에서 인식한 손가락 수만큼 참여할 수 있어요.
-      </p>
-      <p>
-        PC에서는 위치를 클릭해 한 명씩 추가하고, 같은 위치를 다시 클릭하면
-        취소돼요. 키보드는 참여 공간에서 Enter를 누르세요.
-      </p>
-      <button class="primary-button" bind:this={rulesClose} onclick={closeRules}
-        >좋아요, 해볼게요 ↗</button
+    {#each rendered as actor (actor.id)}
+      <div
+        class="fighter"
+        class:fallen={actor.health === 0}
+        class:winner={phase === "result" && winner.id === actor.id}
+        style={`left:${actor.x}px;top:${actor.y}px;--player-color:${COLORS[actor.colorIndex].hex}`}
+        data-player-id={actor.id}
+        data-health={actor.health}
+        data-pose={actor.pose}
+        data-x={actor.x}
+        data-y={actor.y}
+        aria-hidden="true"
       >
-    </div>
+        <span class="fighter-number">{actor.id}</span>
+        {#if phase === "fight" && actor.health > 0}
+          <span class="health"
+            >{#each Array(MAX_HEALTH) as _, index}<i
+                class:empty={index >= actor.health}
+              ></i>{/each}</span
+          >
+        {/if}
+        <Fighter
+          color={COLORS[actor.colorIndex].hex}
+          pose={actor.pose}
+          facing={actor.facing}
+        />
+        {#if phase === "fight" && beat === "impact" && battle.lastHit.targetId === actor.id}
+          {#key battle.turn}
+            {#if battle.lastHit.dodged}<span class="hit-word">회피</span>
+            {:else}<span class="slash" class:critical={battle.lastHit.critical}
+              ></span>{/if}
+          {/key}
+        {/if}
+      </div>
+    {/each}
   </div>
-{/if}
+  <p class="sr-only" aria-live="polite" aria-atomic="true">{announcement}</p>
+  {#if phase === "result"}
+    <div class="result" style={`color:${COLORS[winner.colorIndex].hex}`}>
+      <span>{winner.id}번</span> 오늘 커피 당첨
+    </div>
+    <button
+      class="replay"
+      bind:this={resultButton}
+      onclick={() => {
+        reset();
+        arena.focus({ preventScroll: true });
+      }}>한 판 더</button
+    >
+  {/if}
+</main>

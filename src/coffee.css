@@ -59,11 +59,18 @@ button:focus-visible,
   opacity: 1;
 }
 .game.finished {
-  background: var(--winner-color);
   color: #0c0d0f;
 }
 .game.finished:before {
   display: none;
+}
+.result-wash {
+  position: absolute;
+  inset: 0;
+  background: var(--winner-color);
+  clip-path: circle(var(--reveal-radius) at var(--reveal-x) var(--reveal-y));
+  pointer-events: none;
+  animation: result-spread 0.62s cubic-bezier(0.16, 0.8, 0.22, 1) both;
 }
 .finished .battle-ground {
   opacity: 0.2;
@@ -309,7 +316,7 @@ button:focus-visible,
   gap: 24px;
   z-index: 6;
   pointer-events: none;
-  animation: result-in 0.3s ease-out both;
+  animation: result-in 0.25s ease-out 0.35s both;
 }
 .result-controls.at-top {
   top: max(28px, calc(env(safe-area-inset-top) + 16px));
@@ -393,6 +400,14 @@ button:focus-visible,
   }
   to {
     scale: 1;
+  }
+}
+@keyframes result-spread {
+  from {
+    clip-path: circle(0px at var(--reveal-x) var(--reveal-y));
+  }
+  to {
+    clip-path: circle(var(--reveal-radius) at var(--reveal-x) var(--reveal-y));
   }
 }
 @media (max-width: 360px) {

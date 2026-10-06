@@ -25,6 +25,7 @@
     countdown = 3;
   let battle = null,
     timeline = null;
+  let revealOrigin = null;
   let fightTime = 0,
     resolvedHits = 0,
     clips = [];
@@ -133,6 +134,13 @@
     fingerMarker(p, width, height, orbitTime),
   );
   $: winnerMarker = markers.find((p) => p.id === winner?.id);
+  $: revealX = (revealOrigin?.x ?? 0.5) * width;
+  $: revealY = (revealOrigin?.y ?? 0.5) * height;
+  $: revealRadius =
+    Math.hypot(
+      Math.max(revealX, width - revealX),
+      Math.max(revealY, height - revealY),
+    ) + 2;
   // Keep the result centered on the same finger marker, even near an edge.
   $: resultSize = winnerMarker
     ? Math.min(
@@ -201,6 +209,7 @@
     actors = [];
     battle = null;
     timeline = null;
+    revealOrigin = null;
     clips = [];
     fightTime = 0;
     resolvedHits = 0;
@@ -320,6 +329,10 @@
       .map((a) => ({ ...a, ...attackFrame(a, fightTime, reducedMotion) }));
     if (fightTime >= timeline.end) {
       clips = [];
+      const source = anchorPoint(
+        participants.find((p) => p.id === battle.winnerId),
+      );
+      revealOrigin = { x: source.x / width, y: source.y / height };
       phase = "result";
       vibrate("result");
     }
@@ -584,6 +597,13 @@
   data-active-attacks={clips.length}
   style={`--winner-color:${winner ? COLORS[winner.colorIndex].hex : "#101114"};--result-size:${resultSize}px`}
 >
+  {#if phase === "result"}
+    <div
+      class="result-wash"
+      style={`--reveal-x:${revealX}px;--reveal-y:${revealY}px;--reveal-radius:${revealRadius}px`}
+      aria-hidden="true"
+    ></div>
+  {/if}
   <div
     class="arena"
     bind:this={arena}

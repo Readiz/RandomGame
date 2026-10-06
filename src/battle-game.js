@@ -93,7 +93,7 @@ export function attackTiming(battle) {
 
 export function arenaSlots(players, width, height) {
   const cx = width / 2,
-    cy = height * 0.49;
+    cy = height / 2;
   const radius =
     players.length === 2
       ? Math.min(width * 0.18, 70)

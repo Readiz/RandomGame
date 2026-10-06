@@ -33,7 +33,8 @@
   let motionStarted = 0,
     pauseStarted = 0;
   let raf,
-    lastFrame = 0;
+    lastFrame = 0,
+    orbitTime = 0;
 
   $: playing = phase === "march" || phase === "fight";
   $: alive = battle?.players.filter((p) => p.health > 0) ?? [];
@@ -57,16 +58,67 @@
 
   const clamp = (value, min, max) => Math.max(min, Math.min(value, max));
   const anchorPoint = (p, areaWidth = width, areaHeight = height) => ({
-    x: clamp(p.x, 54, areaWidth - 54),
-    y: clamp(p.y, 54, areaHeight - 54),
+    x: clamp(p.x, 58, areaWidth - 58),
+    y: clamp(p.y, 58, areaHeight - 58),
   });
   // The sprite's head points up at zero degrees. Its center sits under the touch.
-  const heading = (from, to = { x: width / 2, y: height * 0.49 }) =>
-    Math.hypot(to.x - from.x, to.y - from.y) < 1
-      ? 0
-      : (Math.atan2(to.x - from.x, from.y - to.y) * 180) / Math.PI;
-  const turnToward = (current, target, blend) =>
-    current + (((((target - current) % 360) + 540) % 360) - 180) * blend;
+  const heading = (
+    from,
+    areaWidth = width,
+    areaHeight = height,
+    fallback = 0,
+  ) =>
+    Math.hypot(areaWidth / 2 - from.x, areaHeight / 2 - from.y) < 1
+      ? fallback
+      : (Math.atan2(areaWidth / 2 - from.x, from.y - areaHeight / 2) * 180) /
+        Math.PI;
+  function fingerMarker(participant, areaWidth, areaHeight, elapsed) {
+    const anchor = anchorPoint(participant, areaWidth, areaHeight);
+    const orbit =
+      ((elapsed / 6000 + participant.colorIndex / 10) % 1) * Math.PI * 2;
+    const numberX = Math.sin(orbit) * 42;
+    const numberY = -Math.cos(orbit) * 42;
+    return {
+      ...participant,
+      ...anchor,
+      numberX,
+      numberY,
+      numberAngle: heading(
+        { x: anchor.x + numberX, y: anchor.y + numberY },
+        areaWidth,
+        areaHeight,
+      ),
+    };
+  }
+  function connection(actor, participant, areaWidth, areaHeight) {
+    const anchor = anchorPoint(participant, areaWidth, areaHeight);
+    const dx = actor.x - anchor.x,
+      dy = actor.y - anchor.y;
+    const distance = Math.hypot(dx, dy);
+    const ux = dx / (distance || 1),
+      uy = dy / (distance || 1);
+    return {
+      ...actor,
+      visible: distance > 66,
+      x1: anchor.x + ux * 44,
+      y1: anchor.y + uy * 44,
+      x2: actor.x - ux * 22,
+      y2: actor.y - uy * 22,
+    };
+  }
+  $: markers = participants.map((p) =>
+    fingerMarker(p, width, height, orbitTime),
+  );
+  $: connections = battle
+    ? actors.map((actor) =>
+        connection(
+          actor,
+          participants.find((p) => p.id === actor.id),
+          width,
+          height,
+        ),
+      )
+    : [];
   $: if (!battle && width && height) syncLobby();
 
   function stopTimer() {
@@ -88,11 +140,19 @@
     if (!paused) arm();
   }
   function vibrate(pattern) {
-    if (!reducedMotion && navigator.vibrate) navigator.vibrate(pattern);
+    if (typeof navigator.vibrate !== "function") return;
+    if (pattern !== 0 && (reducedMotion || paused || document.hidden)) return;
+    try {
+      navigator.vibrate(pattern);
+    } catch {
+      // Optional device feedback must never interrupt a round.
+    }
   }
 
   function reset() {
     stopTimer();
+    vibrate(0);
+    orbitTime = 0;
     participants = [];
     actors = [];
     battle = null;
@@ -123,6 +183,7 @@
       if (countdown === 0) {
         battle = createBattle(participants);
         phase = "march";
+        vibrate([25, 35, 25]);
         motionStarted = performance.now();
         actors = actors.map((p) => ({ ...p, fromX: p.x, fromY: p.y }));
         schedule(() => {
@@ -135,7 +196,7 @@
           startAttack();
         }, MARCH_MS);
       } else {
-        vibrate(10);
+        vibrate(18);
         schedule(count, 1000);
       }
     }
@@ -152,14 +213,20 @@
         battle = resolveAttack(battle, attack);
         beat = "impact";
         if (!battle.lastHit.dodged)
-          vibrate(battle.lastHit.critical ? [18, 25, 35] : 12);
+          vibrate(
+            battle.lastHit.fallen
+              ? [45, 30, 65]
+              : battle.lastHit.critical
+                ? [30, 25, 50]
+                : 28,
+          );
         schedule(() => {
           beat = "recover";
           if (battle.phase === "done") {
             schedule(() => {
               phase = "result";
               beat = "idle";
-              vibrate([35, 55, 70]);
+              vibrate([60, 55, 100]);
             }, 650);
           } else schedule(startAttack, timing.recover);
         }, timing.impact);
@@ -175,7 +242,7 @@
       ...participants,
       { id: colorIndex + 1, colorIndex, pointerId, x, y },
     ];
-    vibrate(8);
+    vibrate(12);
     beginCountdown();
   }
   function point(event) {
@@ -247,6 +314,7 @@
   function animate(now) {
     const dt = Math.min(now - lastFrame || 16, 48);
     lastFrame = now;
+    if (!paused && !reducedMotion && participants.length) orbitTime += dt;
     if (!paused && battle) {
       const living = battle.players.filter((p) => p.health > 0);
       // Keep a just-defeated target's slot until the current impact finishes.
@@ -269,9 +337,7 @@
       actors = actors.map((actor) => {
         const stats = battle.players.find((p) => p.id === actor.id);
         let goal = homes.find((p) => p.id === actor.id) ?? actor;
-        let pose = "idle",
-          angle = heading(goal);
-        const rotationBlend = reducedMotion ? 1 : 1 - Math.exp(-dt / 110);
+        let pose = "idle";
         if (phase === "march") {
           const progress = clamp((now - motionStarted) / MARCH_MS, 0, 1);
           const eased = progress * progress * (3 - 2 * progress);
@@ -283,19 +349,22 @@
             x,
             y,
             pose: "walk",
-            angle: turnToward(actor.angle, heading({ x, y }), rotationBlend),
+            angle: heading({ x, y }, width, height, actor.angle),
           };
         }
         if (stats.health === 0) {
-          return { ...actor, health: 0, pose: "down" };
+          return {
+            ...actor,
+            health: 0,
+            pose: "down",
+            angle: heading(actor, width, height, actor.angle),
+          };
         }
         if (phase === "result") {
           goal = anchorPoint(participants.find((p) => p.id === actor.id));
-          angle = heading(goal);
           pose =
             Math.hypot(goal.x - actor.x, goal.y - actor.y) > 4 ? "walk" : "win";
         } else if (actor.id === attack?.attackerId && targetHome) {
-          angle = heading(attackerHome, targetHome);
           if (beat === "windup") {
             pose = "windup";
             goal = { x: goal.x - ux * 7, y: goal.y - uy * 7 };
@@ -304,7 +373,6 @@
             goal = { x: targetHome.x - ux * 29, y: targetHome.y - uy * 18 };
           }
         } else if (actor.id === attack?.targetId && attackerHome) {
-          angle = heading(targetHome, attackerHome);
           if (beat === "impact") {
             const dodged = battle.lastHit?.dodged;
             goal = {
@@ -325,7 +393,7 @@
           x,
           y,
           pose,
-          angle: turnToward(actor.angle, angle, rotationBlend),
+          angle: heading({ x, y }, width, height, actor.angle),
         };
       });
     }
@@ -334,13 +402,17 @@
 
   onMount(() => {
     const preference = matchMedia("(prefers-reduced-motion: reduce)");
-    const updatePreference = () => (reducedMotion = preference.matches);
+    const updatePreference = () => {
+      reducedMotion = preference.matches;
+      if (reducedMotion) vibrate(0);
+    };
     updatePreference();
     preference.addEventListener("change", updatePreference);
     raf = requestAnimationFrame(animate);
     const visibility = () => {
       paused = document.hidden;
       if (paused) {
+        vibrate(0);
         pauseStarted = performance.now();
         remaining = Math.max(0, deadline - pauseStarted);
         clearTimeout(timer);
@@ -359,6 +431,7 @@
     window.addEventListener("blur", blur);
     return () => {
       stopTimer();
+      vibrate(0);
       cancelAnimationFrame(raf);
       preference.removeEventListener("change", updatePreference);
       document.removeEventListener("visibilitychange", visibility);
@@ -414,17 +487,44 @@
         결투
       </div>{/if}
 
-    {#each participants as participant (participant.id)}
+    {#if battle}
+      <svg
+        class="connections"
+        viewBox={`0 0 ${width} ${height}`}
+        aria-hidden="true"
+      >
+        {#each connections as link (link.id)}
+          <line
+            class="connection"
+            class:eliminated={link.health === 0}
+            class:striking={phase === "fight" &&
+              beat === "impact" &&
+              (link.id === attack?.attackerId || link.id === attack?.targetId)}
+            data-link-id={link.id}
+            x1={link.x1}
+            y1={link.y1}
+            x2={link.x2}
+            y2={link.y2}
+            stroke={COLORS[link.colorIndex].hex}
+            visibility={link.visible ? "visible" : "hidden"}
+          />
+        {/each}
+      </svg>
+    {/if}
+
+    {#each markers as participant (participant.id)}
       <div
         class="finger"
         class:away={!!battle}
         class:chosen={phase === "result" && winner.id === participant.id}
-        style={`--player-color:${COLORS[participant.colorIndex].hex};--orbit-delay:${-participant.colorIndex * 0.6}s;left:${anchorPoint(participant, width, height).x}px;top:${anchorPoint(participant, width, height).y}px`}
+        style={`--player-color:${COLORS[participant.colorIndex].hex};left:${participant.x}px;top:${participant.y}px;--number-x:${participant.numberX}px;--number-y:${participant.numberY}px;--number-angle:${participant.numberAngle}deg`}
         data-anchor-id={participant.id}
         aria-hidden="true"
       >
         <span class="finger-orbit"
-          ><span class="orbit-number">{participant.id}</span></span
+          ><span class="orbit-number" data-angle={participant.numberAngle}
+            >{participant.id}</span
+          ></span
         >
       </div>
     {/each}

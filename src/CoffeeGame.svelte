@@ -56,10 +56,15 @@
     resultButton.focus({ preventScroll: true });
 
   const clamp = (value, min, max) => Math.max(min, Math.min(value, max));
-  const spawnPoint = (p) => ({
-    x: clamp(p.x, 32, width - 32),
-    y: clamp(p.y - 40, 84, height - 50),
+  const anchorPoint = (p) => ({
+    x: clamp(p.x, 33, width - 33),
+    y: clamp(p.y, 33, height - 33),
   });
+  const spawnPoint = (p) => ({
+    x: anchorPoint(p).x,
+    y: clamp(anchorPoint(p).y - 40, 84, height - 50),
+  });
+  $: if (!battle && width && height) syncLobby();
 
   function stopTimer() {
     clearTimeout(timer);
@@ -402,7 +407,7 @@
         class="finger"
         class:away={!!battle}
         class:chosen={phase === "result" && winner.id === participant.id}
-        style={`--player-color:${COLORS[participant.colorIndex].hex};left:${participant.x}px;top:${participant.y}px`}
+        style={`--player-color:${COLORS[participant.colorIndex].hex};left:${anchorPoint(participant).x}px;top:${anchorPoint(participant).y}px`}
         data-anchor-id={participant.id}
         aria-hidden="true"
       >

@@ -336,8 +336,16 @@ export function resultSlot(player, width, height) {
     dy = 1;
   }
   const distance = Math.hypot(dx, dy);
-  const gap = Math.min(74, Math.max(34, Math.min(width, height) / 2 - 48));
-  return { x: cx + (dx / distance) * gap, y: cy + (dy / distance) * gap };
+  const ux = dx / distance,
+    uy = dy / distance;
+  // In the seat's orientation, the cup rim is 11px above its center and
+  // the fighter's feet are 26px below its center. Keep the feet on the rim.
+  // The cup drawing is also 2px left of its SVG center.
+  return {
+    x: cx - ux * 37 - uy * 2,
+    y: cy - uy * 37 + ux * 2,
+    angle: (Math.atan2(-ux, uy) * 180) / Math.PI,
+  };
 }
 
 export function arenaSlots(

@@ -575,7 +575,10 @@
           x,
           y,
           pose,
-          angle: heading({ x, y }, width, height, actor.angle),
+          angle:
+            phase === "result"
+              ? goal.angle
+              : heading({ x, y }, width, height, actor.angle),
         };
       });
     }
@@ -717,13 +720,11 @@
 
     {#if phase === "result"}
       <CoffeePrize
-        angle={heading(
-          resultSlot(
-            participants.find((p) => p.id === winner.id),
-            width,
-            height,
-          ),
-        )}
+        angle={resultSlot(
+          participants.find((p) => p.id === winner.id),
+          width,
+          height,
+        ).angle}
       />
       <svg
         class="result-target"

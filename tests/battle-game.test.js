@@ -435,7 +435,7 @@ test("hero movement includes distinct arcs and jumps with bounded reduced motion
   }
 });
 
-test("the survivor stands beside the central coffee on their own side of the table", () => {
+test("the survivor's feet meet the coffee rim in the participant's orientation", () => {
   for (const [width, height] of [
     [430, 900],
     [740, 360],
@@ -443,25 +443,27 @@ test("the survivor stands beside the central coffee on their own side of the tab
   ]) {
     for (const p of [
       { x: 0, y: 0 },
+      { x: width, y: 0 },
+      { x: 0, y: height },
       { x: width, y: height },
       { x: width / 2, y: height / 2 },
     ]) {
       const goal = resultSlot(p, width, height);
-      const distance = Math.hypot(goal.x - width / 2, goal.y - height / 2);
-      assert.ok(distance >= 60 && distance <= 74.001);
+      const angle = (goal.angle * Math.PI) / 180;
+      const c = Math.cos(angle),
+        s = Math.sin(angle);
+      const foot = { x: goal.x - 26 * s, y: goal.y + 26 * c };
+      const rim = {
+        x: width / 2 - 2 * c + 11 * s,
+        y: height / 2 - 2 * s - 11 * c,
+      };
+      assert.ok(Math.hypot(foot.x - rim.x, foot.y - rim.y) < 0.001);
       assert.ok(
         goal.x >= 32 &&
           goal.x <= width - 32 &&
           goal.y >= 32 &&
           goal.y <= height - 32,
       );
-      if (p.x !== width / 2)
-        assert.equal(Math.sign(goal.x - width / 2), Math.sign(p.x - width / 2));
-      if (p.y !== height / 2)
-        assert.equal(
-          Math.sign(goal.y - height / 2),
-          Math.sign(p.y - height / 2),
-        );
     }
   }
 });

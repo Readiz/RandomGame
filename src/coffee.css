@@ -117,8 +117,8 @@ button:focus-visible,
   position: absolute;
   left: 50%;
   top: 50%;
-  width: min(75vw, 360px);
-  height: min(45vw, 220px);
+  width: min(88vw, 620px);
+  height: min(68vh, 620px);
   transform: translate(-50%, -50%);
   border: 1px solid #ffffff07;
   border-radius: 50%;

@@ -7,6 +7,8 @@
   export let critical = false;
   export let dodged = false;
   export let reducedMotion = false;
+  export let attackerId;
+  export let turn;
   $: dx = to.x - from.x;
   $: dy = to.y - from.y;
   $: length = Math.hypot(dx, dy) || 1;
@@ -37,6 +39,8 @@
   class="attack-effect"
   class:critical
   data-attack-effect={heroId}
+  data-attacker-id={attackerId}
+  data-attack-turn={turn}
   data-stage={stage}
   data-progress={progress}
   data-dodged={dodged}

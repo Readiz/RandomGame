@@ -1,6 +1,6 @@
 export const MAX_PLAYERS = 10;
 export const MAX_HEALTH = 3;
-export const MARCH_MS = 1450;
+export const MARCH_MS = 1050;
 // Archetypes change presentation and reach, never the combat draw or damage.
 export const HEROES = [
   { id: "suit", name: "파워슈트", reach: 68 },
@@ -103,27 +103,117 @@ export function resolveAttack(battle, attack, random = randomUnit) {
 
 export function attackTiming(battle) {
   const alive = battle.players.filter((p) => p.health > 0).length;
-  if (alive === 2) return { windup: 480, dash: 200, impact: 230, recover: 200 };
-  if (alive <= 4) return { windup: 210, dash: 180, impact: 190, recover: 130 };
-  return { windup: 140, dash: 160, impact: 160, recover: 110 };
+  if (alive === 2)
+    return { windup: 320, dash: 210, impact: 240, recover: 240, gap: 620 };
+  if (alive <= 4)
+    return { windup: 190, dash: 210, impact: 230, recover: 260, gap: 300 };
+  return { windup: 170, dash: 210, impact: 230, recover: 260, gap: 260 };
+}
+
+// Keep exactly the same random combat draws; only their presentation overlaps.
+// Ordered hits ensure an eliminated player never starts a later attack.
+export function createBattleTimeline(participants, random = randomUnit) {
+  const initial = createBattle(participants);
+  let state = initial,
+    nextStart = 0,
+    previousHit = -1;
+  const available = new Map(),
+    actions = [];
+  while (state.phase !== "done") {
+    const attack = planAttack(state, random);
+    const timing = attackTiming(state);
+    const start = Math.max(nextStart, available.get(attack.attackerId) ?? 0);
+    const hit = Math.max(start + timing.windup + timing.dash, previousHit + 1);
+    const result = resolveAttack(state, attack, random);
+    const end = hit + timing.impact + timing.recover;
+    actions.push({ ...attack, start, hit, end, timing, result });
+    available.set(attack.attackerId, hit + timing.impact);
+    nextStart = start + timing.gap;
+    previousHit = hit;
+    state = result;
+  }
+  return {
+    initial,
+    actions,
+    end: Math.max(...actions.map((a) => a.end)) + 180,
+  };
+}
+
+export function attackFrame(action, elapsed, reducedMotion = false) {
+  let stage, started, duration;
+  if (elapsed < action.start + action.timing.windup) {
+    stage = "windup";
+    started = action.start;
+    duration = action.timing.windup;
+  } else if (elapsed < action.hit) {
+    stage = "dash";
+    started = action.start + action.timing.windup;
+    duration = action.hit - started;
+  } else if (elapsed < action.hit + action.timing.impact) {
+    stage = "impact";
+    started = action.hit;
+    duration = action.timing.impact;
+  } else {
+    stage = "recover";
+    started = action.hit + action.timing.impact;
+    duration = action.timing.recover;
+  }
+  return {
+    stage,
+    progress: reducedMotion
+      ? 1
+      : Math.max(0, Math.min(1, (elapsed - started) / duration)),
+  };
 }
 
 export function arenaSlots(players, width, height) {
+  const clamp = (value, low, high) => Math.max(low, Math.min(value, high));
   const cx = width / 2,
     cy = height / 2;
-  const radius =
-    players.length === 2
-      ? Math.min(width * 0.18, 70)
-      : Math.min(width * 0.3, height * 0.2, 140);
-  return players.map((player, index) => {
-    const angle =
-      players.length === 2
-        ? index * Math.PI
-        : (index * Math.PI * 2) / players.length - Math.PI / 2;
+  const slots = players.map((player) => {
+    const x = clamp(
+      player.originX == null ? player.x : player.originX * width,
+      73,
+      width - 73,
+    );
+    const y = clamp(
+      player.originY == null ? player.y : player.originY * height,
+      73,
+      height - 73,
+    );
+    const dx = cx - x,
+      dy = cy - y,
+      distance = Math.hypot(dx, dy);
+    const inward = Math.min(distance, Math.max(72, distance * 0.32));
     return {
       id: player.id,
-      x: cx + Math.cos(angle) * radius,
-      y: cy + Math.sin(angle) * radius * 0.7,
+      x: x + (dx / (distance || 1)) * inward,
+      y: y + (dy / (distance || 1)) * inward,
     };
   });
+  // Separate close touches without replacing their original side of the table.
+  for (let pass = 0; pass < 8; pass++) {
+    for (let i = 0; i < slots.length; i++)
+      for (let j = i + 1; j < slots.length; j++) {
+        const a = slots[i],
+          b = slots[j];
+        const dx = b.x - a.x,
+          dy = b.y - a.y,
+          distance = Math.hypot(dx, dy);
+        if (distance >= 54) continue;
+        const fallback = (i * 2.4 + j) % (Math.PI * 2);
+        const ux = distance > 0.01 ? dx / distance : Math.cos(fallback);
+        const uy = distance > 0.01 ? dy / distance : Math.sin(fallback);
+        const push = (54 - distance) * 0.5;
+        a.x -= ux * push;
+        a.y -= uy * push;
+        b.x += ux * push;
+        b.y += uy * push;
+      }
+    for (const slot of slots) {
+      slot.x = clamp(slot.x, 42, width - 42);
+      slot.y = clamp(slot.y, 55, height - 55);
+    }
+  }
+  return slots;
 }

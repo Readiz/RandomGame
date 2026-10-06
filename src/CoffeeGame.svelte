@@ -10,10 +10,8 @@
     MAX_PLAYERS,
     MAX_HEALTH,
     MARCH_MS,
-    createBattle,
-    planAttack,
-    resolveAttack,
-    attackTiming,
+    createBattleTimeline,
+    attackFrame,
     arenaSlots,
   } from "./battle-game.js";
 
@@ -26,8 +24,10 @@
     beat = "idle",
     countdown = 3;
   let battle = null,
-    attack = null,
-    timing = null;
+    timeline = null;
+  let fightTime = 0,
+    resolvedHits = 0,
+    clips = [];
   let paused = false,
     reducedMotion = false;
   let timer,
@@ -36,9 +36,6 @@
     remaining = 0;
   let motionStarted = 0,
     pauseStarted = 0;
-  let beatStarted = 0,
-    beatProgress = 0,
-    attackAim = null;
   let raf,
     lastFrame = 0,
     orbitTime = 0;
@@ -47,19 +44,24 @@
   $: alive = battle?.players.filter((p) => p.health > 0) ?? [];
   $: winner = battle?.players.find((p) => p.id === battle.winnerId);
   $: duel = phase === "fight" && alive.length === 2;
-  $: rendered = [...actors].sort((a, b) => a.y - b.y);
-  $: striker = actors.find((p) => p.id === attack?.attackerId);
-  $: victim = actors.find((p) => p.id === attack?.targetId);
-  $: aim =
-    attackAim && beat !== "windup"
-      ? { x: attackAim.x * width, y: attackAim.y * height }
-      : victim;
-  $: rig = striker && aim ? attackRig(striker, aim, width, beat) : null;
+  $: effects = clips.map((clip) => effectView(clip, actors, width, height));
+  $: rendered = actors
+    .map((actor) => {
+      const effect = effects.filter((e) => e.attackerId === actor.id).at(-1);
+      return {
+        ...actor,
+        attackStage: effect?.stage ?? "idle",
+        attackProgress: effect?.progress ?? 0,
+        armAngle: effect?.rig.armAngle ?? 0,
+      };
+    })
+    .sort((a, b) => a.y - b.y);
+  $: beat = clips.at(-1)?.stage ?? "idle";
   $: announcement =
     phase === "result"
       ? `${winner.id}번 ${COLORS[winner.colorIndex].name}, 마지막 생존자. 오늘 커피 당첨!`
       : phase === "march"
-        ? "중앙으로 모이는 중. 손을 떼도 됩니다."
+        ? "자기 자리 앞에서 난투를 준비합니다. 손을 떼도 됩니다."
         : phase === "fight"
           ? `${alive.length}명 생존.${duel ? " 마지막 결투!" : ""}`
           : phase === "countdown"
@@ -178,8 +180,10 @@
     participants = [];
     actors = [];
     battle = null;
-    attack = null;
-    attackAim = null;
+    timeline = null;
+    clips = [];
+    fightTime = 0;
+    resolvedHits = 0;
     phase = "lobby";
     beat = "idle";
     countdown = 3;
@@ -204,7 +208,14 @@
     function count() {
       countdown -= 1;
       if (countdown === 0) {
-        battle = createBattle(participants);
+        timeline = createBattleTimeline(
+          participants.map((p) => ({
+            ...p,
+            originX: p.x / width,
+            originY: p.y / height,
+          })),
+        );
+        battle = timeline.initial;
         phase = "march";
         vibrate([25, 35, 25]);
         motionStarted = performance.now();
@@ -216,7 +227,8 @@
             ...slots.find((s) => s.id === p.id),
           }));
           phase = "fight";
-          startAttack();
+          fightTime = 0;
+          resolvedHits = 0;
         }, MARCH_MS);
       } else {
         vibrate(18);
@@ -226,44 +238,71 @@
     schedule(count, 1000);
   }
 
-  function startAttack() {
-    attack = planAttack(battle);
-    timing = attackTiming(battle);
-    attackAim = null;
-    setBeat("windup");
-    schedule(() => {
-      const target = actors.find((p) => p.id === attack.targetId);
-      attackAim = { x: target.x / width, y: target.y / height };
-      setBeat("dash");
-      schedule(() => {
-        battle = resolveAttack(battle, attack);
-        setBeat("impact");
-        if (!battle.lastHit.dodged)
-          vibrate(
-            battle.lastHit.fallen
-              ? [45, 30, 65]
-              : battle.lastHit.critical
-                ? [30, 25, 50]
-                : 28,
-          );
-        schedule(() => {
-          setBeat("recover");
-          if (battle.phase === "done") {
-            schedule(() => {
-              phase = "result";
-              beat = "idle";
-              vibrate([60, 55, 100]);
-            }, 650);
-          } else schedule(startAttack, timing.recover);
-        }, timing.impact);
-      }, timing.dash);
-    }, timing.windup);
+  function effectView(clip, field, areaWidth, areaHeight) {
+    const striker = field.find((p) => p.id === clip.attackerId);
+    const target = field.find((p) => p.id === clip.targetId);
+    const to = clip.aim
+      ? { x: clip.aim.x * areaWidth, y: clip.aim.y * areaHeight }
+      : target;
+    const rig = attackRig(striker, to, areaWidth, clip.stage);
+    const from =
+      clip.origin && (clip.stage === "recover" || striker.health === 0)
+        ? { x: clip.origin.x * areaWidth, y: clip.origin.y * areaHeight }
+        : rig;
+    const landed = clip.stage === "impact" || clip.stage === "recover";
+    return {
+      ...clip,
+      from,
+      to,
+      rig,
+      heroId: striker.heroId,
+      critical: landed && clip.result.lastHit.critical,
+      dodged: landed && clip.result.lastHit.dodged,
+    };
   }
 
-  function setBeat(value) {
-    beat = value;
-    beatStarted = performance.now();
-    beatProgress = 0;
+  function advanceBrawl(dt) {
+    fightTime += dt;
+    for (const action of timeline.actions) {
+      if (!action.aim && fightTime >= action.start + action.timing.windup) {
+        const target = actors.find((p) => p.id === action.targetId);
+        action.aim = { x: target.x / width, y: target.y / height };
+      }
+    }
+    while (
+      resolvedHits < timeline.actions.length &&
+      timeline.actions[resolvedHits].hit <= fightTime
+    ) {
+      const action = timeline.actions[resolvedHits++];
+      const striker = actors.find((p) => p.id === action.attackerId);
+      const target = actors.find((p) => p.id === action.targetId);
+      if (!action.result.lastHit.dodged)
+        action.aim = { x: target.x / width, y: target.y / height };
+      const origin = attackRig(
+        striker,
+        { x: action.aim.x * width, y: action.aim.y * height },
+        width,
+        "impact",
+      );
+      action.origin = { x: origin.x / width, y: origin.y / height };
+      battle = action.result;
+      if (!battle.lastHit.dodged)
+        vibrate(
+          battle.lastHit.fallen
+            ? [45, 30, 65]
+            : battle.lastHit.critical
+              ? [30, 25, 50]
+              : 28,
+        );
+    }
+    clips = timeline.actions
+      .filter((a) => a.start <= fightTime && fightTime < a.end)
+      .map((a) => ({ ...a, ...attackFrame(a, fightTime, reducedMotion) }));
+    if (fightTime >= timeline.end) {
+      clips = [];
+      phase = "result";
+      vibrate([60, 55, 100]);
+    }
   }
 
   function addParticipant(x, y, pointerId = null) {
@@ -355,32 +394,16 @@
     lastFrame = now;
     if (!paused && !reducedMotion && participants.length) orbitTime += dt;
     if (!paused && battle) {
-      if (phase === "fight" && timing)
-        beatProgress = reducedMotion
-          ? 1
-          : clamp((now - beatStarted) / timing[beat], 0, 1);
-      const living = battle.players.filter((p) => p.health > 0);
-      // Keep a just-defeated target's slot until the current impact finishes.
-      const field =
-        phase === "fight" &&
-        (beat === "impact" || beat === "recover") &&
-        battle.lastHit?.fallen
-          ? battle.players.filter(
-              (p) => p.health > 0 || p.id === battle.lastHit.targetId,
-            )
-          : living;
-      const homes = arenaSlots(field, width, height);
-      const targetHome = homes.find((p) => p.id === attack?.targetId);
-      const attackerHome = homes.find((p) => p.id === attack?.attackerId);
-      const dx = targetHome && attackerHome ? targetHome.x - attackerHome.x : 0;
-      const dy = targetHome && attackerHome ? targetHome.y - attackerHome.y : 0;
-      const length = Math.hypot(dx, dy) || 1;
-      const ux = dx / length,
-        uy = dy / length;
+      if (phase === "fight") advanceBrawl(dt);
+      const homes = arenaSlots(battle.players, width, height);
       actors = actors.map((actor) => {
         const stats = battle.players.find((p) => p.id === actor.id);
         let goal = homes.find((p) => p.id === actor.id) ?? actor;
         let pose = "idle";
+        const action = clips.filter((c) => c.attackerId === actor.id).at(-1);
+        const incoming = clips
+          .filter((c) => c.targetId === actor.id && c.stage === "impact")
+          .at(-1);
         if (phase === "march") {
           const progress = clamp((now - motionStarted) / MARCH_MS, 0, 1);
           const eased = progress * progress * (3 - 2 * progress);
@@ -407,34 +430,63 @@
           goal = anchorPoint(participants.find((p) => p.id === actor.id));
           pose =
             Math.hypot(goal.x - actor.x, goal.y - actor.y) > 4 ? "walk" : "win";
-        } else if (actor.id === attack?.attackerId && targetHome) {
-          if (beat === "windup") {
-            pose = "windup";
-            goal = { x: goal.x - ux * 7, y: goal.y - uy * 7 };
-          } else if (beat === "dash" || beat === "impact") {
-            pose = "swing";
-            const reach =
-              HEROES.find((hero) => hero.id === actor.heroId)?.reach ?? 29;
+        } else {
+          const home = goal;
+          if (!reducedMotion) {
             goal = {
-              x: targetHome.x - ux * reach,
-              y: targetHome.y - uy * reach,
+              x:
+                home.x +
+                Math.sin(fightTime / 230 + actor.id * 1.7) * 16 +
+                Math.cos(fightTime / 530 + actor.id) * 10,
+              y: home.y + Math.cos(fightTime / 270 + actor.id * 2.1) * 18,
             };
-          } else if (beat === "recover") {
-            pose = "recover";
+            pose = "walk";
           }
-        } else if (actor.id === attack?.targetId && attackerHome) {
-          if (beat === "impact") {
-            const dodged = battle.lastHit?.dodged;
+          if (action) {
+            const target = action.aim
+              ? { x: action.aim.x * width, y: action.aim.y * height }
+              : actors.find((p) => p.id === action.targetId);
+            const dx = target.x - home.x,
+              dy = target.y - home.y;
+            const distance = Math.hypot(dx, dy) || 1,
+              ux = dx / distance,
+              uy = dy / distance;
+            if (action.stage === "windup") {
+              pose = "windup";
+              goal = { x: home.x - ux * 8, y: home.y - uy * 8 };
+            } else if (action.stage === "dash" || action.stage === "impact") {
+              pose = "swing";
+              const reach =
+                HEROES.find((h) => h.id === actor.heroId)?.reach ?? 29;
+              const travel = Math.max(
+                0,
+                Math.min(distance - reach, actor.heroId === "giant" ? 150 : 38),
+              );
+              goal = { x: home.x + ux * travel, y: home.y + uy * travel };
+            } else pose = "recover";
+          }
+          if (incoming) {
+            const other = actors.find((p) => p.id === incoming.attackerId);
+            const dx = actor.x - other.x,
+              dy = actor.y - other.y,
+              distance = Math.hypot(dx, dy) || 1;
+            const ux = dx / distance,
+              uy = dy / distance;
+            const dodged = incoming.result.lastHit.dodged;
             goal = {
-              x: goal.x + (dodged ? -uy * 22 : ux * 15),
-              y: goal.y + (dodged ? ux * 22 : uy * 10),
+              x: goal.x + (dodged ? -uy * 24 : ux * 13),
+              y: goal.y + (dodged ? ux * 24 : uy * 13),
             };
-            pose = dodged ? "walk" : "hurt";
+            if (!action) pose = dodged ? "walk" : "hurt";
           }
+          goal = {
+            x: clamp(goal.x, 36, width - 36),
+            y: clamp(goal.y, 42, height - 42),
+          };
         }
         const blend = reducedMotion
           ? 1
-          : 1 - Math.exp(-dt / (beat === "dash" ? 24 : 90));
+          : 1 - Math.exp(-dt / (action?.stage === "dash" ? 30 : 90));
         const x = actor.x + (goal.x - actor.x) * blend,
           y = actor.y + (goal.y - actor.y) * blend;
         return {
@@ -471,7 +523,6 @@
         clearTimeout(timer);
         if (!battle) reset();
       } else {
-        beatStarted += performance.now() - pauseStarted;
         if (phase === "march")
           motionStarted += performance.now() - pauseStarted;
         lastFrame = performance.now();
@@ -508,6 +559,7 @@
   data-phase={phase}
   data-beat={beat}
   data-turn={battle?.turn ?? 0}
+  data-active-attacks={clips.length}
   style={`--winner-color:${winner ? COLORS[winner.colorIndex].hex : "#101114"}`}
 >
   <div
@@ -557,9 +609,11 @@
           <line
             class="connection"
             class:eliminated={link.health === 0}
-            class:striking={phase === "fight" &&
-              beat === "impact" &&
-              (link.id === attack?.attackerId || link.id === attack?.targetId)}
+            class:striking={clips.some(
+              (c) =>
+                c.stage === "impact" &&
+                (link.id === c.attackerId || link.id === c.targetId),
+            )}
             data-link-id={link.id}
             x1={link.x1}
             y1={link.y1}
@@ -624,38 +678,35 @@
           pose={actor.pose}
           number={actor.id}
           heroId={actor.heroId}
-          attackStage={phase === "fight" && actor.id === attack?.attackerId
-            ? beat
-            : "idle"}
-          attackProgress={beatProgress}
-          armAngle={actor.id === attack?.attackerId ? (rig?.armAngle ?? 0) : 0}
+          attackStage={actor.attackStage}
+          attackProgress={actor.attackProgress}
+          armAngle={actor.armAngle}
         />
-        {#if phase === "fight" && beat === "impact" && battle.lastHit.targetId === actor.id}
-          {#key battle.turn}
-            {#if battle.lastHit.dodged}<span class="hit-word">회피</span>
-            {/if}
-          {/key}
-        {/if}
+        {#each clips.filter((c) => c.targetId === actor.id && c.stage === "impact" && c.result.lastHit.dodged) as dodge (dodge.turn)}
+          <span class="hit-word">회피</span>
+        {/each}
       </div>
     {/each}
-    {#if phase === "fight" && striker && aim && rig}
+    {#if effects.length}
       <svg
         class="combat-effects"
         viewBox={`0 0 ${width} ${height}`}
         aria-hidden="true"
       >
-        <AttackEffect
-          from={rig}
-          to={aim}
-          heroId={striker.heroId}
-          stage={beat}
-          progress={beatProgress}
-          {reducedMotion}
-          critical={(beat === "impact" || beat === "recover") &&
-            battle.lastHit?.critical}
-          dodged={(beat === "impact" || beat === "recover") &&
-            battle.lastHit?.dodged}
-        />
+        {#each effects as effect (effect.turn)}
+          <AttackEffect
+            attackerId={effect.attackerId}
+            turn={effect.turn}
+            from={effect.from}
+            to={effect.to}
+            heroId={effect.heroId}
+            stage={effect.stage}
+            progress={effect.progress}
+            {reducedMotion}
+            critical={effect.critical}
+            dodged={effect.dodged}
+          />
+        {/each}
       </svg>
     {/if}
   </div>

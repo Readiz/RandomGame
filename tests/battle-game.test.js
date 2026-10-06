@@ -9,6 +9,8 @@ import {
   arenaSlots,
   HEROES,
   chooseHero,
+  createBattleTimeline,
+  attackFrame,
 } from "../src/battle-game.js";
 const people = (count = 4) =>
   Array.from({ length: count }, (_, id) => ({ id, x: id * 80, y: id * 120 }));
@@ -174,4 +176,88 @@ test("invalid participant counts and duplicate identities are rejected", () => {
   assert.throws(() => createBattle(people(1)), RangeError);
   assert.throws(() => createBattle(people(11)), RangeError);
   assert.throws(() => createBattle([{ id: 1 }, { id: 1 }]), RangeError);
+});
+
+test("overlapping brawls preserve the exact serial combat draw and one winner", () => {
+  for (const count of [2, 6, 10])
+    for (let seed = 1; seed <= 30; seed++) {
+      const players = people(count);
+      const timeline = createBattleTimeline(players, seeded(seed));
+      const random = seeded(seed);
+      let state = createBattle(players),
+        previousHit = -1;
+      for (const action of timeline.actions) {
+        const expected = planAttack(state, random);
+        assert.equal(action.attackerId, expected.attackerId);
+        assert.equal(action.targetId, expected.targetId);
+        assert.ok(action.hit > previousHit);
+        assert.ok(action.start < action.hit && action.hit < action.end);
+        state = resolveAttack(state, expected, random);
+        assert.deepEqual(action.result, state);
+        previousHit = action.hit;
+      }
+      assert.equal(state.phase, "done");
+      assert.equal(state.players.filter((p) => p.health > 0).length, 1);
+      assert.ok(timeline.actions.every((a) => a.end < timeline.end));
+    }
+});
+
+test("separate attackers overlap but an arm finishes its impact before attacking again", () => {
+  const timeline = createBattleTimeline(people(10), seeded(42));
+  assert.ok(
+    timeline.actions.some((a, i) => timeline.actions[i + 1]?.start < a.hit),
+  );
+  const last = new Map();
+  for (const action of timeline.actions) {
+    if (last.has(action.attackerId))
+      assert.ok(action.start >= last.get(action.attackerId));
+    last.set(action.attackerId, action.hit + action.timing.impact);
+    assert.equal(attackFrame(action, action.start).stage, "windup");
+    assert.equal(
+      attackFrame(action, action.start + action.timing.windup).stage,
+      "dash",
+    );
+    assert.equal(attackFrame(action, action.hit).stage, "impact");
+    assert.equal(
+      attackFrame(action, action.hit + action.timing.impact).stage,
+      "recover",
+    );
+  }
+});
+
+test("assembly stays on each finger's side and moves only a short distance inward", () => {
+  const players = [
+    { id: 1, x: 90, y: 130 },
+    { id: 2, x: 340, y: 130 },
+    { id: 3, x: 90, y: 770 },
+    { id: 4, x: 340, y: 770 },
+  ];
+  const slots = arenaSlots(players, 430, 900);
+  for (const p of players) {
+    const slot = slots.find((s) => s.id === p.id);
+    const before = Math.hypot(p.x - 215, p.y - 450);
+    assert.ok(Math.hypot(slot.x - p.x, slot.y - p.y) < before * 0.4);
+    assert.equal(Math.sign(slot.x - 215), Math.sign(p.x - 215));
+    assert.equal(Math.sign(slot.y - 450), Math.sign(p.y - 450));
+  }
+  const normalized = players.map((p) => ({
+    ...p,
+    originX: p.x / 430,
+    originY: p.y / 900,
+  }));
+  const rotated = arenaSlots(normalized, 900, 430);
+  assert.ok(
+    rotated.every((p) => p.x >= 42 && p.x <= 858 && p.y >= 55 && p.y <= 375),
+  );
+  const crowded = arenaSlots(
+    people(10).map((p) => ({ ...p, x: 160, y: 120 })),
+    320,
+    240,
+  );
+  assert.ok(crowded.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)));
+  assert.ok(
+    crowded.every((p, i) =>
+      crowded.every((q, j) => i === j || Math.hypot(p.x - q.x, p.y - q.y) > 35),
+    ),
+  );
 });

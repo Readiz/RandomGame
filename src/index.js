@@ -1,6 +1,7 @@
-import Svelte from './index.svelte';
-import 'bootstrap/dist/css/bootstrap.min.css';
+import { mount } from "svelte";
+import Svelte from "./index.svelte";
+import "bootstrap/dist/css/bootstrap.min.css";
 
-new Svelte({
-  target: document.body
+mount(Svelte, {
+  target: document.body,
 });

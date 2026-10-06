@@ -3,3 +3,6 @@ dist
 .rpt2_cache
 *.log
 docs/index.html
+output/
+.playwright-cli/
+.DS_Store

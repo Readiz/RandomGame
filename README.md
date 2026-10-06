@@ -1,7 +1,45 @@
-# Random Game
+# 운빨망겜 · Coffee Edition
 
-Simple Game with your friends to determine who is win or lose.
+점심시간에 한 화면으로 커피 살 사람을 정하는 자동 검 강화 게임.
 
-To play: https://www.readiz.com/RandomGame/
+플레이: https://blog.readiz.com/RandomGame/
 
-Android Play Store: 운빨망겜 (It only supports Korean now)
+## 커피내기
+
+- 2명 이상 화면에 손가락을 올리고 3초 동안 유지하면 자동 시작합니다.
+- 손가락 근처의 색상·번호 팝업에서 각자의 검이 동시에 강화됩니다.
+- 가장 먼저 검이 깨진 한 명이 커피 당첨자입니다. 시작 후에는 손을 떼도 참가자와 결과가 유지됩니다.
+- 같은 라운드에 여러 검이 깨지면 해당 사람들끼리 최대 3번 자동 재강화합니다. 계속 동점이면 남은 사람 중 한 명을 무작위로 고릅니다. 이 경우 결과에 추첨 사실을 표시합니다.
+- 강화 확률과 시작 조건은 모두 같습니다. 기본 라운드는 최대 9회, 재강화는 최대 3회로 끝납니다. 참가자를 순서대로 탈락 처리하지 않고 라운드 전체를 함께 판정합니다.
+- 손가락은 최대 10개까지 등록할 수 있습니다. 실제 동시 터치 수는 기기에 따라 달라집니다.
+- PC에서는 클릭으로 인원을 추가하고 같은 위치를 다시 클릭해 취소합니다. 키보드는 참여 공간에 초점을 맞춘 뒤 Enter/Space로 추가할 수 있습니다.
+- `혼자 미리 해보기`는 가상 참가자 3명의 연습입니다. 실제 내기와 구분해서 표시합니다.
+- 화면을 벗어나면 대기는 취소됩니다. 진행 중인 게임은 탭이 숨겨진 동안 멈췄다가 돌아오면 이어집니다.
+
+기존 캐릭터·인원 설정 방식은 [클래식 게임](https://blog.readiz.com/RandomGame/classic.html)으로 제공됩니다.
+
+## 개발
+
+Node.js 22.12 이상, npm을 사용합니다.
+
+```sh
+npm ci
+npm run dev
+npm test
+npm run build
+npm run preview
+```
+
+기존 Node Sass/Rollup 구성을 Vite와 Svelte 5로 바꿨습니다. 클래식은 원래 컴포넌트를 별도 진입점에서 빌드합니다. 클래식 컴포넌트의 기존 접근성 경고는 커피내기 진입점과 별개입니다.
+
+## 배포
+
+현재 GitHub Pages는 `master` 브랜치의 `/docs`를 공개합니다.
+
+```sh
+npm run release:pages
+```
+
+이 명령은 테스트·빌드 후 필요한 정적 파일을 `docs`에 복사합니다. 자산을 먼저 복사하고 HTML을 마지막에 교체합니다. 검증한 소스와 `docs` 변경만 커밋해 `master`로 푸시하면 Pages가 배포합니다. 로컬 `output` 검증 자료와 의존성 폴더는 커밋하지 않습니다.
+
+검 이미지는 기존 운빨망겜 자산을 재사용합니다. 원본 출처: https://www.gdunlimited.net/resources/cat/rpg-maker-xp/icons/2/comments/desc/96

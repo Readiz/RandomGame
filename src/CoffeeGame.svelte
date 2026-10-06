@@ -56,9 +56,9 @@
     resultButton.focus({ preventScroll: true });
 
   const clamp = (value, min, max) => Math.max(min, Math.min(value, max));
-  const anchorPoint = (p) => ({
-    x: clamp(p.x, 33, width - 33),
-    y: clamp(p.y, 33, height - 33),
+  const anchorPoint = (p, areaWidth = width, areaHeight = height) => ({
+    x: clamp(p.x, 33, areaWidth - 33),
+    y: clamp(p.y, 33, areaHeight - 33),
   });
   const spawnPoint = (p) => ({
     x: anchorPoint(p).x,
@@ -407,7 +407,7 @@
         class="finger"
         class:away={!!battle}
         class:chosen={phase === "result" && winner.id === participant.id}
-        style={`--player-color:${COLORS[participant.colorIndex].hex};left:${anchorPoint(participant).x}px;top:${anchorPoint(participant).y}px`}
+        style={`--player-color:${COLORS[participant.colorIndex].hex};left:${anchorPoint(participant, width, height).x}px;top:${anchorPoint(participant, width, height).y}px`}
         data-anchor-id={participant.id}
         aria-hidden="true"
       >

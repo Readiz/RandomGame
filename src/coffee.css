@@ -62,13 +62,17 @@ button:focus-visible,
   background: var(--winner-color);
   color: #0c0d0f;
 }
-.game.finished:before,
-.finished .battle-ground,
-.finished .connections,
-.finished .fighter,
-.finished .finger:not(.chosen),
-.finished .finger-orbit {
+.game.finished:before {
   display: none;
+}
+.finished .battle-ground {
+  opacity: 0.2;
+}
+.finished .connection {
+  stroke: #0c0d0f;
+}
+.finished .fighter.fallen .body {
+  opacity: 0.4;
 }
 .arena {
   position: absolute;
@@ -213,20 +217,22 @@ button:focus-visible,
   opacity: 0.18;
 }
 .finger.chosen {
-  width: var(--result-size);
-  height: var(--result-size);
   opacity: 1;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  color: #0c0d0f;
-  animation: result-stamp 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+  border-width: 2px;
+  border-color: var(--player-color);
+}
+.finger.chosen .finger-orbit {
+  inset: -2px;
 }
 .result-target {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  width: var(--result-size);
+  height: var(--result-size);
+  transform: translate(-50%, -50%);
   fill: none;
-  stroke: currentColor;
+  stroke: #0c0d0f;
+  pointer-events: none;
+  animation: result-stamp 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .fighter {
   position: absolute;
@@ -258,6 +264,9 @@ button:focus-visible,
 }
 .fallen {
   pointer-events: none;
+}
+.fighter.winner {
+  z-index: 1;
 }
 .hit-word {
   position: absolute;

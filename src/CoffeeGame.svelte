@@ -648,6 +648,28 @@
       </svg>
     {/if}
 
+    {#if phase === "result"}
+      <svg
+        class="result-target"
+        style={`left:${winnerMarker.x}px;top:${winnerMarker.y}px`}
+        viewBox={`0 0 ${resultSize} ${resultSize}`}
+        aria-hidden="true"
+      >
+        <circle
+          cx={resultSize / 2}
+          cy={resultSize / 2}
+          r={resultSize / 2 - 8}
+          stroke-width="16"
+        />
+        <circle
+          cx={resultSize / 2}
+          cy={resultSize / 2}
+          r={resultSize / 2 - 22}
+          stroke-width="4"
+        />
+      </svg>
+    {/if}
+
     {#each markers as participant (participant.id)}
       <div
         class="finger"
@@ -659,12 +681,6 @@
         data-anchor-id={participant.id}
         aria-hidden="true"
       >
-        {#if phase === "result" && winner.id === participant.id}
-          <svg class="result-target" viewBox="0 0 100 100" aria-hidden="true">
-            <circle cx="50" cy="50" r="39.5" stroke-width="21" />
-            <circle cx="50" cy="50" r="22" stroke-width="5" />
-          </svg>
-        {/if}
         <span class="finger-orbit">
           {#each participant.numbers as number, index}
             <span

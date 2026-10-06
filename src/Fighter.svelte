@@ -1,7 +1,7 @@
 <script>
   export let color = "#d3f580";
   export let pose = "idle";
-  export let facing = 1;
+  export let number = 1;
 </script>
 
 <svg
@@ -15,7 +15,6 @@
   viewBox="0 0 44 52"
   fill="none"
   aria-hidden="true"
-  style={`--armor:${color};--facing:${facing}`}
 >
   <ellipse
     class="shadow"
@@ -46,12 +45,6 @@
       /></g
     >
     <path d="M14 21H29L32 35 22 39 11 35Z" fill={color} />
-    <path
-      d="M21 23V35M14 32H29"
-      stroke="#10151f"
-      opacity=".3"
-      stroke-width="2"
-    />
     <path
       d="M13 22 10 30M29 22 33 29"
       stroke="#9aa3ac"
@@ -94,6 +87,14 @@
       opacity=".4"
       stroke-width="1.5"
     />
+    <text
+      class="torso-number"
+      class:double-digit={number >= 10}
+      x="23.5"
+      y="34"
+      text-anchor="middle"
+      fill="#152018">{number}</text
+    >
   </g>
 </svg>
 
@@ -103,7 +104,16 @@
     width: 100%;
     height: 100%;
     overflow: visible;
-    transform: scaleX(var(--facing));
+  }
+  .torso-number {
+    font:
+      900 10px system-ui,
+      sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  .torso-number.double-digit {
+    font-size: 8px;
+    letter-spacing: -0.7px;
   }
   .body {
     transform-origin: 22px 43px;

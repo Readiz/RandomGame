@@ -57,13 +57,16 @@
 
   const clamp = (value, min, max) => Math.max(min, Math.min(value, max));
   const anchorPoint = (p, areaWidth = width, areaHeight = height) => ({
-    x: clamp(p.x, 33, areaWidth - 33),
-    y: clamp(p.y, 33, areaHeight - 33),
+    x: clamp(p.x, 54, areaWidth - 54),
+    y: clamp(p.y, 54, areaHeight - 54),
   });
-  const spawnPoint = (p) => ({
-    x: anchorPoint(p).x,
-    y: clamp(anchorPoint(p).y - 40, 84, height - 50),
-  });
+  // The sprite's head points up at zero degrees. Its center sits under the touch.
+  const heading = (from, to = { x: width / 2, y: height * 0.49 }) =>
+    Math.hypot(to.x - from.x, to.y - from.y) < 1
+      ? 0
+      : (Math.atan2(to.x - from.x, from.y - to.y) * 180) / Math.PI;
+  const turnToward = (current, target, blend) =>
+    current + (((((target - current) % 360) + 540) % 360) - 180) * blend;
   $: if (!battle && width && height) syncLobby();
 
   function stopTimer() {
@@ -102,10 +105,10 @@
   function syncLobby() {
     actors = participants.map((p) => ({
       ...p,
-      ...spawnPoint(p),
+      ...anchorPoint(p),
       health: MAX_HEALTH,
       pose: "idle",
-      facing: p.x < width / 2 ? 1 : -1,
+      angle: heading(anchorPoint(p)),
     }));
   }
 
@@ -267,30 +270,32 @@
         const stats = battle.players.find((p) => p.id === actor.id);
         let goal = homes.find((p) => p.id === actor.id) ?? actor;
         let pose = "idle",
-          facing = actor.facing;
+          angle = heading(goal);
+        const rotationBlend = reducedMotion ? 1 : 1 - Math.exp(-dt / 110);
         if (phase === "march") {
           const progress = clamp((now - motionStarted) / MARCH_MS, 0, 1);
           const eased = progress * progress * (3 - 2 * progress);
+          const x = actor.fromX + (goal.x - actor.fromX) * eased;
+          const y = actor.fromY + (goal.y - actor.fromY) * eased;
           return {
             ...actor,
             ...stats,
-            x: actor.fromX + (goal.x - actor.fromX) * eased,
-            y: actor.fromY + (goal.y - actor.fromY) * eased,
+            x,
+            y,
             pose: "walk",
-            facing: goal.x >= actor.fromX ? 1 : -1,
+            angle: turnToward(actor.angle, heading({ x, y }), rotationBlend),
           };
         }
         if (stats.health === 0) {
           return { ...actor, health: 0, pose: "down" };
         }
         if (phase === "result") {
-          goal = spawnPoint(participants.find((p) => p.id === actor.id));
-          if (Math.abs(goal.x - actor.x) > 2)
-            facing = goal.x > actor.x ? 1 : -1;
+          goal = anchorPoint(participants.find((p) => p.id === actor.id));
+          angle = heading(goal);
           pose =
             Math.hypot(goal.x - actor.x, goal.y - actor.y) > 4 ? "walk" : "win";
         } else if (actor.id === attack?.attackerId && targetHome) {
-          facing = dx >= 0 ? 1 : -1;
+          angle = heading(attackerHome, targetHome);
           if (beat === "windup") {
             pose = "windup";
             goal = { x: goal.x - ux * 7, y: goal.y - uy * 7 };
@@ -299,7 +304,7 @@
             goal = { x: targetHome.x - ux * 29, y: targetHome.y - uy * 18 };
           }
         } else if (actor.id === attack?.targetId && attackerHome) {
-          facing = dx >= 0 ? -1 : 1;
+          angle = heading(targetHome, attackerHome);
           if (beat === "impact") {
             const dodged = battle.lastHit?.dodged;
             goal = {
@@ -314,7 +319,14 @@
           : 1 - Math.exp(-dt / (beat === "dash" ? 24 : 90));
         const x = actor.x + (goal.x - actor.x) * blend,
           y = actor.y + (goal.y - actor.y) * blend;
-        return { ...actor, health: stats.health, x, y, pose, facing };
+        return {
+          ...actor,
+          health: stats.health,
+          x,
+          y,
+          pose,
+          angle: turnToward(actor.angle, angle, rotationBlend),
+        };
       });
     }
     raf = requestAnimationFrame(animate);
@@ -407,14 +419,12 @@
         class="finger"
         class:away={!!battle}
         class:chosen={phase === "result" && winner.id === participant.id}
-        style={`--player-color:${COLORS[participant.colorIndex].hex};left:${anchorPoint(participant, width, height).x}px;top:${anchorPoint(participant, width, height).y}px`}
+        style={`--player-color:${COLORS[participant.colorIndex].hex};--orbit-delay:${-participant.colorIndex * 0.6}s;left:${anchorPoint(participant, width, height).x}px;top:${anchorPoint(participant, width, height).y}px`}
         data-anchor-id={participant.id}
         aria-hidden="true"
       >
-        <span
-          >{phase === "result" && winner.id === participant.id
-            ? "☕"
-            : participant.id}</span
+        <span class="finger-orbit"
+          ><span class="orbit-number">{participant.id}</span></span
         >
       </div>
     {/each}
@@ -424,15 +434,15 @@
         class="fighter"
         class:fallen={actor.health === 0}
         class:winner={phase === "result" && winner.id === actor.id}
-        style={`left:${actor.x}px;top:${actor.y}px;--player-color:${COLORS[actor.colorIndex].hex}`}
+        style={`left:${actor.x}px;top:${actor.y}px;--player-color:${COLORS[actor.colorIndex].hex};--facing-angle:${actor.angle}deg`}
         data-player-id={actor.id}
         data-health={actor.health}
         data-pose={actor.pose}
         data-x={actor.x}
         data-y={actor.y}
+        data-angle={actor.angle}
         aria-hidden="true"
       >
-        <span class="fighter-number">{actor.id}</span>
         {#if phase === "fight" && actor.health > 0}
           <span class="health"
             >{#each Array(MAX_HEALTH) as _, index}<i
@@ -443,7 +453,7 @@
         <Fighter
           color={COLORS[actor.colorIndex].hex}
           pose={actor.pose}
-          facing={actor.facing}
+          number={actor.id}
         />
         {#if phase === "fight" && beat === "impact" && battle.lastHit.targetId === actor.id}
           {#key battle.turn}

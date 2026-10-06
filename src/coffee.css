@@ -141,8 +141,8 @@ button:focus-visible,
 }
 .finger {
   position: absolute;
-  width: 66px;
-  height: 66px;
+  width: 84px;
+  height: 84px;
   transform: translate(-50%, -50%);
   border: 1px solid color-mix(in srgb, var(--player-color) 55%, transparent);
   border-radius: 50%;
@@ -157,9 +157,28 @@ button:focus-visible,
     box-shadow 0.55s,
     border-color 0.55s;
 }
-.finger span {
-  font-size: 17px;
-  font-weight: 500;
+.finger-orbit {
+  position: absolute;
+  inset: -1px;
+  animation: orbit-number 6s linear infinite;
+  animation-delay: var(--orbit-delay);
+}
+.orbit-number {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 3px;
+  border-radius: 50%;
+  background: #0c0d0f;
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
 }
 .finger.away {
   opacity: 0.16;
@@ -170,27 +189,16 @@ button:focus-visible,
   border-color: var(--player-color);
   box-shadow: 0 0 65px color-mix(in srgb, var(--player-color) 18%, transparent);
 }
-.finger.chosen span {
-  font-size: 25px;
+.finger.chosen .finger-orbit {
+  inset: -2px;
 }
 .fighter {
   position: absolute;
   width: 54px;
   height: 64px;
-  transform: translate(-50%, -100%);
+  transform: translate(-50%, -50%) rotate(var(--facing-angle));
   pointer-events: none;
-  will-change: left, top;
-}
-.fighter-number {
-  position: absolute;
-  left: 50%;
-  top: -18px;
-  transform: translateX(-50%);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
-  color: var(--player-color);
-  text-shadow: 0 1px 5px #000;
+  will-change: left, top, transform;
 }
 .health {
   display: flex;
@@ -211,9 +219,6 @@ button:focus-visible,
 .health i.empty {
   background: #ffffff1a;
   box-shadow: none;
-}
-.fallen .fighter-number {
-  opacity: 0.2;
 }
 .fallen {
   pointer-events: none;
@@ -300,6 +305,14 @@ button:focus-visible,
 .paused * {
   animation-play-state: paused !important;
 }
+@keyframes orbit-number {
+  from {
+    rotate: 0deg;
+  }
+  to {
+    rotate: 360deg;
+  }
+}
 @keyframes float-hit {
   from {
     translate: 0 4px;
@@ -334,10 +347,6 @@ button:focus-visible,
   .fighter {
     width: 48px;
     height: 57px;
-  }
-  .finger {
-    width: 60px;
-    height: 60px;
   }
   .result {
     font-size: 18px;

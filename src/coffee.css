@@ -278,7 +278,7 @@ button:focus-visible,
   pointer-events: none;
 }
 .fighter.winner {
-  z-index: 1;
+  z-index: 3;
 }
 .hit-word {
   position: absolute;
@@ -367,6 +367,9 @@ button:focus-visible,
   overflow: hidden;
 }
 .paused * {
+  animation-play-state: paused !important;
+}
+.cinematic .arena * {
   animation-play-state: paused !important;
 }
 @keyframes float-hit {

@@ -15,7 +15,12 @@ import {
   FINGER_ORBIT_RADIUS,
   FINGER_RING_SIZE,
   DUEL_EXCHANGES,
+  CUTIN_MS,
+  cinematicFrame,
+  advanceFightClock,
+  resultSlot,
 } from "../src/battle-game.js";
+import { attackMotion, SPECIALS } from "../src/attack-presentation.js";
 const people = (count = 4) =>
   Array.from({ length: count }, (_, id) => ({ id, x: id * 80, y: id * 120 }));
 const sequence = (...values) => {
@@ -327,6 +332,136 @@ test("finger circles and orbit numbers remain inside screen edges", () => {
       assert.ok(anchor.y - FINGER_ORBIT_RADIUS >= 13);
       assert.ok(anchor.x + FINGER_ORBIT_RADIUS <= width - 13);
       assert.ok(anchor.y + FINGER_ORBIT_RADIUS <= height - 13);
+    }
+  }
+});
+
+test("specials preserve the combat draw and isolate at most two short cutscenes", () => {
+  let comebacks = 0;
+  for (const count of [2, 6, 10])
+    for (let seed = 1; seed <= 80; seed++) {
+      const players = people(count).map((p, i) => ({
+        ...p,
+        heroId: HEROES[i % 6].id,
+      }));
+      const timeline = createBattleTimeline(players, seeded(seed));
+      assert.deepEqual(
+        timeline.actions.at(-1).result,
+        finish(players, seeded(seed)),
+      );
+      const specials = timeline.actions.filter((a) => a.ultimate);
+      assert.ok(specials.length >= 1 && specials.length <= 2);
+      assert.equal(
+        new Set(specials.map((a) => a.attackerId)).size,
+        specials.length,
+      );
+      assert.equal(timeline.actions.at(-1).ultimate, true);
+      let before = timeline.initial;
+      for (const [index, action] of timeline.actions.entries()) {
+        assert.ok(action.variant === 0 || action.variant === 1);
+        if (action.ultimate) {
+          assert.equal(action.start - action.cutinStart, CUTIN_MS);
+          assert.equal(action.visualOnly, false);
+          assert.ok(action.hitEffect.damage > 0);
+          assert.ok(
+            timeline.actions
+              .slice(0, index)
+              .every((a) => a.end < action.cutinStart),
+          );
+          assert.ok(
+            timeline.actions
+              .slice(index + 1)
+              .every((a) => a.start > action.end),
+          );
+          const attacker = before.players.find(
+            (p) => p.id === action.attackerId,
+          );
+          const target = before.players.find((p) => p.id === action.targetId);
+          const targetAfter = action.result.players.find(
+            (p) => p.id === action.targetId,
+          );
+          if (action.specialKind === "comeback") {
+            comebacks++;
+            assert.equal(attacker.health, 1);
+            assert.ok(
+              attacker.health < target.health &&
+                attacker.health > targetAfter.health,
+            );
+          }
+          if (action.specialKind === "rally") assert.equal(attacker.health, 1);
+        }
+        before = action.result;
+      }
+    }
+  assert.ok(comebacks > 0, "seeded rounds must exercise real lead reversals");
+});
+
+test("slow frames cannot skip a cutscene and the next attack waits for it", () => {
+  const timeline = createBattleTimeline(people(2), seeded(4));
+  const action = timeline.actions.find((a) => a.ultimate);
+  const at = advanceFightClock(timeline, action.cutinStart - 1, 5000);
+  assert.equal(at, action.cutinStart);
+  assert.equal(cinematicFrame(timeline, at).progress, 0);
+  assert.equal(advanceFightClock(timeline, at, 5000), at + 100);
+  assert.equal(
+    advanceFightClock(timeline, action.start - 10, 5000),
+    action.start,
+  );
+  assert.equal(cinematicFrame(timeline, action.start), null);
+  assert.equal(cinematicFrame(timeline, timeline.end), null);
+});
+
+test("hero movement includes distinct arcs and jumps with bounded reduced motion", () => {
+  const home = { x: 80, y: 140 },
+    target = { x: 300, y: 550 };
+  const action = { stage: "dash", progress: 0.5, variant: 1, ultimate: true };
+  const motions = HEROES.map((h) => attackMotion(h.id, action, home, target));
+  assert.ok(new Set(motions.map((m) => JSON.stringify(m))).size >= 4);
+  assert.ok(attackMotion("giant", action, home, target).lift < -40);
+  for (const h of HEROES) {
+    assert.ok(SPECIALS[h.id].name.length > 0);
+    const reduced = attackMotion(h.id, action, home, target, true);
+    assert.equal(reduced.lift, 0);
+    for (const stage of ["windup", "dash", "impact", "recover"])
+      for (const p of [0, 0.5, 1]) {
+        const m = attackMotion(
+          h.id,
+          { ...action, stage, progress: p },
+          home,
+          home,
+        );
+        assert.ok(Number.isFinite(m.x) && Number.isFinite(m.y));
+      }
+  }
+});
+
+test("the survivor stands beside the central coffee on their own side of the table", () => {
+  for (const [width, height] of [
+    [430, 900],
+    [740, 360],
+    [320, 240],
+  ]) {
+    for (const p of [
+      { x: 0, y: 0 },
+      { x: width, y: height },
+      { x: width / 2, y: height / 2 },
+    ]) {
+      const goal = resultSlot(p, width, height);
+      const distance = Math.hypot(goal.x - width / 2, goal.y - height / 2);
+      assert.ok(distance >= 60 && distance <= 74.001);
+      assert.ok(
+        goal.x >= 32 &&
+          goal.x <= width - 32 &&
+          goal.y >= 32 &&
+          goal.y <= height - 32,
+      );
+      if (p.x !== width / 2)
+        assert.equal(Math.sign(goal.x - width / 2), Math.sign(p.x - width / 2));
+      if (p.y !== height / 2)
+        assert.equal(
+          Math.sign(goal.y - height / 2),
+          Math.sign(p.y - height / 2),
+        );
     }
   }
 });

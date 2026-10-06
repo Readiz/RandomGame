@@ -2,10 +2,11 @@
   import { onMount } from "svelte";
   import Fighter from "./Fighter.svelte";
   import AttackEffect from "./AttackEffect.svelte";
-  import { attackRig } from "./attack-presentation.js";
+  import UltimateCutin from "./UltimateCutin.svelte";
+  import CoffeePrize from "./CoffeePrize.svelte";
+  import { attackRig, attackMotion, SPECIALS } from "./attack-presentation.js";
   import {
     COLORS,
-    HEROES,
     chooseHero,
     MAX_PLAYERS,
     MAX_HEALTH,
@@ -13,8 +14,11 @@
     FINGER_RING_SIZE,
     FINGER_ORBIT_RADIUS,
     fingerAnchor,
+    resultSlot,
     createBattleTimeline,
     attackFrame,
+    cinematicFrame,
+    advanceFightClock,
     arenaSlots,
   } from "./battle-game.js";
 
@@ -32,6 +36,8 @@
   let fightTime = 0,
     resolvedHits = 0,
     clips = [];
+  let cinematic = null,
+    lastSpecialId = null;
   let paused = false,
     reducedMotion = false;
   let timer,
@@ -58,12 +64,15 @@
         attackStage: effect?.stage ?? "idle",
         attackProgress: effect?.progress ?? 0,
         armAngle: effect?.rig.armAngle ?? 0,
+        variant: effect?.variant ?? 0,
+        ultimate: effect?.ultimate ?? false,
       };
     })
     .sort((a, b) => a.y - b.y);
   $: beat = clips.at(-1)?.stage ?? "idle";
-  $: announcement =
-    phase === "result"
+  $: announcement = cinematic
+    ? `${cinematic.attackerId}번, ${SPECIALS[actors.find((a) => a.id === cinematic.attackerId)?.heroId]?.name ?? "필살기"}!`
+    : phase === "result"
       ? `${winner.id}번 ${COLORS[winner.colorIndex].name}, 마지막 생존자. 오늘 커피 당첨!`
       : phase === "march"
         ? "자기 자리 앞에서 난투를 준비합니다. 손을 떼도 됩니다."
@@ -214,6 +223,8 @@
     clips = [];
     fightTime = 0;
     resolvedHits = 0;
+    cinematic = null;
+    lastSpecialId = null;
     phase = "lobby";
     beat = "idle";
     countdown = 3;
@@ -278,7 +289,7 @@
     const to = clip.aim
       ? { x: clip.aim.x * areaWidth, y: clip.aim.y * areaHeight }
       : target;
-    const rig = attackRig(striker, to, areaWidth, clip.stage);
+    const rig = attackRig(striker, to, areaWidth, clip.stage, clip.variant);
     const from =
       clip.origin && (clip.stage === "recover" || striker.health === 0)
         ? { x: clip.origin.x * areaWidth, y: clip.origin.y * areaHeight }
@@ -297,7 +308,12 @@
   }
 
   function advanceBrawl(dt) {
-    fightTime += dt;
+    fightTime = advanceFightClock(timeline, fightTime, dt);
+    cinematic = cinematicFrame(timeline, fightTime);
+    if (cinematic && lastSpecialId !== cinematic.id) {
+      lastSpecialId = cinematic.id;
+      vibrate([22, 35, 45]);
+    }
     for (const action of timeline.actions) {
       if (!action.aim && fightTime >= action.start + action.timing.windup) {
         const target = actors.find((p) => p.id === action.targetId);
@@ -318,6 +334,7 @@
         { x: action.aim.x * width, y: action.aim.y * height },
         width,
         "impact",
+        action.variant,
       );
       action.origin = { x: origin.x / width, y: origin.y / height };
       if (action.visualOnly) {
@@ -327,11 +344,13 @@
       battle = action.result;
       if (!battle.lastHit.dodged)
         vibrate(
-          battle.lastHit.fallen
-            ? [45, 30, 65]
-            : battle.lastHit.critical
-              ? [30, 25, 50]
-              : 28,
+          action.ultimate
+            ? [45, 25, 65]
+            : battle.lastHit.fallen
+              ? [45, 30, 65]
+              : battle.lastHit.critical
+                ? [30, 25, 50]
+                : 28,
         );
     }
     clips = timeline.actions
@@ -339,6 +358,7 @@
       .map((a) => ({ ...a, ...attackFrame(a, fightTime, reducedMotion) }));
     if (fightTime >= timeline.end) {
       clips = [];
+      cinematic = null;
       const source = anchorPoint(
         participants.find((p) => p.id === battle.winnerId),
       );
@@ -436,12 +456,14 @@
     const elapsed = Math.max(0, now - lastFrame || 16);
     const dt = Math.min(elapsed, 48);
     lastFrame = now;
-    if (!paused && !reducedMotion && participants.length) orbitTime += dt;
+    if (!paused && !cinematic && !reducedMotion && participants.length)
+      orbitTime += dt;
     if (!paused && battle) {
       // Physics stays bounded on slow devices, but combat follows real elapsed time.
       if (phase === "fight") advanceBrawl(elapsed);
       const homes = battleHomes;
       actors = actors.map((actor) => {
+        if (cinematic) return { ...actor, pose: "idle" };
         const stats = battle.players.find((p) => p.id === actor.id);
         let goal = homes.find((p) => p.id === actor.id) ?? actor;
         let pose = "idle";
@@ -472,12 +494,11 @@
           };
         }
         if (phase === "result") {
-          goal = arenaSlots(
-            [participants.find((p) => p.id === actor.id)],
+          goal = resultSlot(
+            participants.find((p) => p.id === actor.id),
             width,
             height,
-            { minimumAdvance: 104, inwardRatio: 0 },
-          )[0];
+          );
           pose =
             Math.hypot(goal.x - actor.x, goal.y - actor.y) > 4 ? "walk" : "win";
         } else {
@@ -496,24 +517,20 @@
             const target = action.aim
               ? { x: action.aim.x * width, y: action.aim.y * height }
               : actors.find((p) => p.id === action.targetId);
-            const dx = target.x - home.x,
-              dy = target.y - home.y;
-            const distance = Math.hypot(dx, dy) || 1,
-              ux = dx / distance,
-              uy = dy / distance;
-            if (action.stage === "windup") {
-              pose = "windup";
-              goal = { x: home.x - ux * 8, y: home.y - uy * 8 };
-            } else if (action.stage === "dash" || action.stage === "impact") {
-              pose = "swing";
-              const reach =
-                HEROES.find((h) => h.id === actor.heroId)?.reach ?? 29;
-              const travel = Math.max(
-                0,
-                Math.min(distance - reach, actor.heroId === "giant" ? 150 : 38),
-              );
-              goal = { x: home.x + ux * travel, y: home.y + uy * travel };
-            } else pose = "recover";
+            const motion = attackMotion(
+              actor.heroId,
+              action,
+              home,
+              target,
+              reducedMotion,
+            );
+            goal = { x: motion.x, y: motion.y + motion.lift };
+            pose =
+              action.stage === "windup"
+                ? "windup"
+                : action.stage === "recover"
+                  ? "recover"
+                  : "swing";
           }
           if (incoming) {
             const other = actors.find((p) => p.id === incoming.attackerId);
@@ -525,8 +542,16 @@
             const dodged = incoming.hitEffect.dodged;
             const parried = incoming.hitEffect.parried;
             goal = {
-              x: goal.x + (dodged ? -uy * 24 : ux * (parried ? 5 : 13)),
-              y: goal.y + (dodged ? ux * 24 : uy * (parried ? 5 : 13)),
+              x:
+                goal.x +
+                (dodged
+                  ? -uy * 24
+                  : ux * (parried ? 5 : incoming.ultimate ? 27 : 13)),
+              y:
+                goal.y +
+                (dodged
+                  ? ux * 24
+                  : uy * (parried ? 5 : incoming.ultimate ? 27 : 13)),
             };
             if (!action) pose = dodged ? "walk" : parried ? "guard" : "hurt";
           }
@@ -537,7 +562,11 @@
         }
         const blend = reducedMotion
           ? 1
-          : 1 - Math.exp(-dt / (action?.stage === "dash" ? 30 : 90));
+          : 1 -
+            Math.exp(
+              -dt /
+                (phase === "result" ? 180 : action?.stage === "dash" ? 30 : 90),
+            );
         const x = actor.x + (goal.x - actor.x) * blend,
           y = actor.y + (goal.y - actor.y) * blend;
         return {
@@ -606,6 +635,7 @@
   class="game"
   class:duel
   class:paused
+  class:cinematic={!!cinematic}
   class:finished={phase === "result"}
   data-phase={phase}
   data-beat={beat}
@@ -686,6 +716,15 @@
     {/if}
 
     {#if phase === "result"}
+      <CoffeePrize
+        angle={heading(
+          resultSlot(
+            participants.find((p) => p.id === winner.id),
+            width,
+            height,
+          ),
+        )}
+      />
       <svg
         class="result-target"
         style={`left:${winnerMarker.x}px;top:${winnerMarker.y}px`}
@@ -762,6 +801,8 @@
           attackStage={actor.attackStage}
           attackProgress={actor.attackProgress}
           armAngle={actor.armAngle}
+          variant={actor.variant}
+          ultimate={actor.ultimate}
         />
         {#each clips.filter((c) => c.targetId === actor.id && c.stage === "impact" && (c.hitEffect.dodged || c.hitEffect.parried)) as defense (defense.id)}
           <span class="hit-word"
@@ -790,11 +831,24 @@
             critical={effect.critical}
             dodged={effect.dodged}
             parried={effect.parried}
+            variant={effect.variant}
+            ultimate={effect.ultimate}
           />
         {/each}
       </svg>
     {/if}
   </div>
+  {#if cinematic}
+    {@const caster = actors.find((a) => a.id === cinematic.attackerId)}
+    <UltimateCutin
+      actor={caster}
+      progress={cinematic.progress}
+      kind={cinematic.specialKind}
+      color={COLORS[caster.colorIndex].hex}
+      size={Math.min(320, Math.min(width, height) * 0.7)}
+      {reducedMotion}
+    />
+  {/if}
   <p class="sr-only" aria-live="polite" aria-atomic="true">{announcement}</p>
   {#if phase === "result"}
     <div class="result-controls" class:at-top={winnerMarker.y >= height / 2}>

@@ -1,4 +1,6 @@
 <script>
+  import PowerAttack from "./PowerAttack.svelte";
+  import { SPECIALS } from "./attack-presentation.js";
   export let from;
   export let to;
   export let heroId;
@@ -11,6 +13,8 @@
   export let reducedMotion = false;
   export let attackerId;
   export let turn;
+  export let variant = 0;
+  export let ultimate = false;
   $: dx = to.x - from.x;
   $: dy = to.y - from.y;
   $: length = Math.hypot(dx, dy) || 1;
@@ -46,14 +50,28 @@
   data-attack-id={clipId}
   data-stage={stage}
   data-progress={progress}
+  data-variant={variant}
+  data-ultimate={ultimate}
   data-dodged={dodged}
   data-parried={parried}
   data-origin-x={from.x}
   data-origin-y={from.y}
   fill="none"
   stroke-linecap="round"
+  style={`color:${SPECIALS[heroId]?.color ?? "#d4f5ff"}`}
 >
-  {#if charging}
+  {#if ultimate || variant === 1}
+    <PowerAttack
+      {heroId}
+      {from}
+      {to}
+      {stage}
+      {progress}
+      {ultimate}
+      {hit}
+      {reducedMotion}
+    />
+  {:else if charging}
     <g transform={`translate(${from.x} ${from.y})`} data-cue="charge">
       {#if heroId === "suit"}
         <circle

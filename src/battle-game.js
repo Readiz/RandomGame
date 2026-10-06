@@ -5,6 +5,7 @@ export const FINGER_RING_SIZE = 112;
 export const FINGER_ORBIT_RADIUS = 78;
 export const FINGER_MARGIN = 94;
 export const DUEL_EXCHANGES = 6;
+export const CUTIN_MS = 820;
 // Archetypes change presentation and reach, never the combat draw or damage.
 export const HEROES = [
   { id: "suit", name: "파워슈트", reach: 68 },
@@ -193,11 +194,99 @@ export function createBattleTimeline(participants, random = randomUnit) {
     previousHit = hit;
     state = result;
   }
-  return {
-    initial,
-    actions,
-    end: Math.max(...actions.map((a) => a.end)) + 180,
-  };
+  return stageBattlePresentation(initial, actions);
+}
+
+// Choose spectacle from already resolved hits. No extra random draws or damage.
+export function stageBattlePresentation(initial, source) {
+  let before = initial;
+  const hits = source
+    .filter((action) => !action.visualOnly)
+    .map((action) => {
+      const attacker = before.players.find((p) => p.id === action.attackerId);
+      const target = before.players.find((p) => p.id === action.targetId);
+      const afterTarget = action.result.players.find((p) => p.id === target.id);
+      const duel = before.players.filter((p) => p.health > 0).length === 2;
+      const rally =
+        duel && attacker.health === 1 && action.hitEffect.damage > 0;
+      const comeback =
+        rally &&
+        attacker.health < target.health &&
+        attacker.health > afterTarget.health;
+      before = action.result;
+      return { action, rally, comeback };
+    });
+  const finale = hits.at(-1);
+  const highlight =
+    hits.find((h) => h.comeback) ??
+    hits.find((h) => h.rally) ??
+    hits.find((h) => h.action.hitEffect.critical);
+  const selected = new Map();
+  if (highlight && highlight.action.attackerId !== finale.action.attackerId)
+    selected.set(
+      highlight.action.id,
+      highlight.comeback ? "comeback" : highlight.rally ? "rally" : "ultimate",
+    );
+  selected.set(
+    finale.action.id,
+    finale.comeback ? "comeback" : finale.rally ? "rally" : "ultimate",
+  );
+  let shift = 0,
+    barrier = 0,
+    latestEnd = 0;
+  const counts = new Map();
+  const actions = source.map((original) => {
+    const count = counts.get(original.attackerId) ?? 0;
+    counts.set(original.attackerId, count + 1);
+    const action = {
+      ...original,
+      variant: count % 2,
+      ultimate: selected.has(original.id),
+    };
+    shift += Math.max(0, barrier - (original.start + shift));
+    action.start += shift;
+    action.hit += shift;
+    action.end += shift;
+    if (action.ultimate) {
+      action.specialKind = selected.get(action.id);
+      action.cutinStart = Math.max(action.start, latestEnd + 120);
+      action.start = action.cutinStart + CUTIN_MS;
+      action.timing = {
+        windup: 280,
+        dash: 360,
+        impact: 260,
+        recover: 300,
+        gap: 1200,
+      };
+      action.hit = action.start + action.timing.windup + action.timing.dash;
+      action.end = action.hit + action.timing.impact + action.timing.recover;
+      shift = action.end - original.end;
+      barrier = action.end + 120;
+    }
+    latestEnd = Math.max(latestEnd, action.end);
+    return action;
+  });
+  return { initial, actions, end: latestEnd + 180 };
+}
+
+export function cinematicFrame(timeline, elapsed) {
+  const action = timeline.actions.find(
+    (a) => a.ultimate && elapsed >= a.cutinStart && elapsed < a.start,
+  );
+  return action
+    ? { ...action, progress: (elapsed - action.cutinStart) / CUTIN_MS }
+    : null;
+}
+
+export function advanceFightClock(timeline, current, elapsed) {
+  const cinematic = cinematicFrame(timeline, current);
+  if (cinematic)
+    return Math.min(cinematic.start, current + Math.min(elapsed, 100));
+  const next = timeline.actions.find(
+    (a) =>
+      a.ultimate && a.cutinStart > current && a.cutinStart <= current + elapsed,
+  );
+  return next ? next.cutinStart : current + elapsed;
 }
 
 export function attackFrame(action, elapsed, reducedMotion = false) {
@@ -234,6 +323,21 @@ export function fingerAnchor(player, width, height) {
     x: Math.max(mx, Math.min(player.x, width - mx)),
     y: Math.max(my, Math.min(player.y, height - my)),
   };
+}
+
+export function resultSlot(player, width, height) {
+  const anchor = fingerAnchor(player, width, height);
+  const cx = width / 2,
+    cy = height / 2;
+  let dx = anchor.x - cx,
+    dy = anchor.y - cy;
+  if (Math.hypot(dx, dy) < 1) {
+    dx = 0;
+    dy = 1;
+  }
+  const distance = Math.hypot(dx, dy);
+  const gap = Math.min(74, Math.max(34, Math.min(width, height) / 2 - 48));
+  return { x: cx + (dx / distance) * gap, y: cy + (dy / distance) * gap };
 }
 
 export function arenaSlots(

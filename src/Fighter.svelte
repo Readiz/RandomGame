@@ -6,6 +6,8 @@
   export let attackStage = "idle";
   export let attackProgress = 0;
   export let armAngle = 0;
+  export let variant = 0;
+  export let ultimate = false;
   $: casting = attackStage !== "idle";
   $: aimed = casting && ["suit", "web", "mage"].includes(heroId);
   const suits = {
@@ -22,6 +24,8 @@
 <svg
   class={`hero ${heroId} ${pose}`}
   class:casting
+  class:alt={variant === 1}
+  class:ultimate
   data-attack-stage={attackStage}
   viewBox="0 0 44 52"
   fill="none"
@@ -354,6 +358,37 @@
   }
   .guard .weapon {
     transform: rotate(-65deg);
+  }
+  .ultimate .body {
+    filter: drop-shadow(0 0 3px #b8edff);
+  }
+  .ultimate.windup .body {
+    transform: translate(0, -3px) scale(1.08);
+  }
+  .suit.alt.swing .body {
+    transform: translate(0, -3px);
+  }
+  .shield.alt.swing .body {
+    transform: translate(-3px, 2px) rotate(-12deg);
+  }
+  .thunder.alt.swing .weapon {
+    transform: rotate(140deg);
+  }
+  .giant.alt.swing .weapon {
+    transform: rotate(-95deg);
+  }
+  .giant.ultimate.swing .body {
+    transform: translate(0, 5px) scale(1.18, 0.86);
+  }
+  .web.alt.swing .left-leg {
+    transform: rotate(65deg);
+  }
+  .web.alt.swing .right-leg {
+    transform: rotate(-50deg);
+  }
+  .mage.ultimate .cape {
+    transform: scaleX(1.35);
+    transform-origin: 22px 25px;
   }
   .down .body {
     transform: translate(4px, 7px) rotate(85deg);

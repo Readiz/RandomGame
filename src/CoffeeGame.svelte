@@ -43,6 +43,7 @@
   $: playing = phase === "march" || phase === "fight";
   $: alive = battle?.players.filter((p) => p.health > 0) ?? [];
   $: winner = battle?.players.find((p) => p.id === battle.winnerId);
+  $: battleHomes = battle ? arenaSlots(battle.players, width, height) : [];
   $: duel = phase === "fight" && alive.length === 2;
   $: effects = clips.map((clip) => effectView(clip, actors, width, height));
   $: rendered = actors
@@ -390,12 +391,14 @@
   }
 
   function animate(now) {
-    const dt = Math.min(now - lastFrame || 16, 48);
+    const elapsed = Math.max(0, now - lastFrame || 16);
+    const dt = Math.min(elapsed, 48);
     lastFrame = now;
     if (!paused && !reducedMotion && participants.length) orbitTime += dt;
     if (!paused && battle) {
-      if (phase === "fight") advanceBrawl(dt);
-      const homes = arenaSlots(battle.players, width, height);
+      // Physics stays bounded on slow devices, but combat follows real elapsed time.
+      if (phase === "fight") advanceBrawl(elapsed);
+      const homes = battleHomes;
       actors = actors.map((actor) => {
         const stats = battle.players.find((p) => p.id === actor.id);
         let goal = homes.find((p) => p.id === actor.id) ?? actor;

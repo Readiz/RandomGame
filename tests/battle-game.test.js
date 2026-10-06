@@ -11,6 +11,10 @@ import {
   chooseHero,
   createBattleTimeline,
   attackFrame,
+  fingerAnchor,
+  FINGER_ORBIT_RADIUS,
+  FINGER_RING_SIZE,
+  DUEL_EXCHANGES,
 } from "../src/battle-game.js";
 const people = (count = 4) =>
   Array.from({ length: count }, (_, id) => ({ id, x: id * 80, y: id * 120 }));
@@ -187,14 +191,19 @@ test("overlapping brawls preserve the exact serial combat draw and one winner", 
       let state = createBattle(players),
         previousHit = -1;
       for (const action of timeline.actions) {
+        assert.ok(action.hit > previousHit);
+        assert.ok(action.start < action.hit && action.hit < action.end);
+        previousHit = action.hit;
+        if (action.visualOnly) {
+          assert.deepEqual(action.result, state);
+          assert.equal(action.hitEffect.damage, 0);
+          continue;
+        }
         const expected = planAttack(state, random);
         assert.equal(action.attackerId, expected.attackerId);
         assert.equal(action.targetId, expected.targetId);
-        assert.ok(action.hit > previousHit);
-        assert.ok(action.start < action.hit && action.hit < action.end);
         state = resolveAttack(state, expected, random);
         assert.deepEqual(action.result, state);
-        previousHit = action.hit;
       }
       assert.equal(state.phase, "done");
       assert.equal(state.players.filter((p) => p.health > 0).length, 1);
@@ -225,7 +234,7 @@ test("separate attackers overlap but an arm finishes its impact before attacking
   }
 });
 
-test("assembly stays on each finger's side and moves only a short distance inward", () => {
+test("assembly advances clear of the larger finger circles while staying on its original side", () => {
   const players = [
     { id: 1, x: 90, y: 130 },
     { id: 2, x: 340, y: 130 },
@@ -235,8 +244,18 @@ test("assembly stays on each finger's side and moves only a short distance inwar
   const slots = arenaSlots(players, 430, 900);
   for (const p of players) {
     const slot = slots.find((s) => s.id === p.id);
-    const before = Math.hypot(p.x - 215, p.y - 450);
-    assert.ok(Math.hypot(slot.x - p.x, slot.y - p.y) < before * 0.4);
+    const anchor = fingerAnchor(p, 430, 900);
+    const before = Math.hypot(anchor.x - 215, anchor.y - 450);
+    const advance = Math.hypot(slot.x - anchor.x, slot.y - anchor.y);
+    assert.ok(advance >= 120 && advance < before * 0.55);
+    const lobby = arenaSlots([p], 430, 900, {
+      minimumAdvance: 96,
+      inwardRatio: 0,
+    })[0];
+    assert.ok(
+      Math.abs(Math.hypot(lobby.x - anchor.x, lobby.y - anchor.y) - 96) < 0.01,
+    );
+    assert.ok(advance > Math.hypot(lobby.x - anchor.x, lobby.y - anchor.y));
     assert.equal(Math.sign(slot.x - 215), Math.sign(p.x - 215));
     assert.equal(Math.sign(slot.y - 450), Math.sign(p.y - 450));
   }
@@ -260,4 +279,54 @@ test("assembly stays on each finger's side and moves only a short distance inwar
       crowded.every((q, j) => i === j || Math.hypot(p.x - q.x, p.y - q.y) > 35),
     ),
   );
+});
+
+test("final duel adds three parries per finalist without changing combat state", () => {
+  for (const count of [2, 6, 10]) {
+    const timeline = createBattleTimeline(people(count), seeded(37));
+    const actions = timeline.actions;
+    const exchanges = actions.filter((a) => a.visualOnly);
+    assert.equal(exchanges.length, DUEL_EXCHANGES);
+    assert.equal(new Set(actions.map((a) => a.id)).size, actions.length);
+    const first = actions.indexOf(exchanges[0]);
+    const state = first ? actions[first - 1].result : timeline.initial;
+    const finalists = state.players.filter((p) => p.health > 0);
+    assert.equal(finalists.length, 2);
+    assert.ok(actions.slice(0, first).every((a) => a.end < exchanges[0].start));
+    for (const [index, action] of exchanges.entries()) {
+      assert.equal(action.result, state);
+      assert.equal(action.hitEffect.parried, true);
+      assert.equal(action.hitEffect.damage, 0);
+      assert.ok(finalists.some((p) => p.id === action.attackerId));
+      assert.ok(finalists.some((p) => p.id === action.targetId));
+      assert.notEqual(action.attackerId, action.targetId);
+      if (index)
+        assert.notEqual(action.attackerId, exchanges[index - 1].attackerId);
+    }
+    for (const p of finalists)
+      assert.equal(exchanges.filter((a) => a.attackerId === p.id).length, 3);
+    assert.ok(actions[first + DUEL_EXCHANGES].start > exchanges.at(-1).end);
+  }
+});
+
+test("finger circles and orbit numbers remain inside screen edges", () => {
+  assert.equal(FINGER_RING_SIZE, 112);
+  assert.ok(FINGER_ORBIT_RADIUS > FINGER_RING_SIZE / 2 + 13);
+  for (const [width, height] of [
+    [320, 240],
+    [393, 802],
+    [430, 900],
+  ]) {
+    for (const [x, y] of [
+      [0, 0],
+      [width, height],
+      [width / 2, height / 2],
+    ]) {
+      const anchor = fingerAnchor({ x, y }, width, height);
+      assert.ok(anchor.x - FINGER_ORBIT_RADIUS >= 13);
+      assert.ok(anchor.y - FINGER_ORBIT_RADIUS >= 13);
+      assert.ok(anchor.x + FINGER_ORBIT_RADIUS <= width - 13);
+      assert.ok(anchor.y + FINGER_ORBIT_RADIUS <= height - 13);
+    }
+  }
 });

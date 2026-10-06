@@ -121,6 +121,11 @@ button:focus-visible,
   color: #7b827b;
   font-size: 18px;
 }
+.invitation small {
+  margin-top: 18px;
+  color: #8c968c;
+  font-size: 12px;
+}
 .countdown {
   font-size: clamp(100px, 29vw, 170px);
   font-weight: 200;
@@ -178,8 +183,8 @@ button:focus-visible,
 }
 .finger {
   position: absolute;
-  width: 84px;
-  height: 84px;
+  width: var(--finger-size);
+  height: var(--finger-size);
   transform: translate(-50%, -50%);
   border: 1px solid var(--player-color);
   border: 1px solid color-mix(in srgb, var(--player-color) 55%, transparent);
@@ -207,12 +212,12 @@ button:focus-visible,
   transform: translate(-50%, -50%) rotate(var(--number-angle));
   display: grid;
   place-items: center;
-  min-width: 22px;
-  height: 22px;
+  min-width: 26px;
+  height: 26px;
   padding: 0 3px;
   border-radius: 50%;
   background: #0c0d0f;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1;
   font-weight: 650;
   font-variant-numeric: tabular-nums;

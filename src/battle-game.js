@@ -1,6 +1,10 @@
 export const MAX_PLAYERS = 10;
 export const MAX_HEALTH = 3;
 export const MARCH_MS = 1050;
+export const FINGER_RING_SIZE = 112;
+export const FINGER_ORBIT_RADIUS = 78;
+export const FINGER_MARGIN = 94;
+export const DUEL_EXCHANGES = 6;
 // Archetypes change presentation and reach, never the combat draw or damage.
 export const HEROES = [
   { id: "suit", name: "파워슈트", reach: 68 },
@@ -116,17 +120,74 @@ export function createBattleTimeline(participants, random = randomUnit) {
   const initial = createBattle(participants);
   let state = initial,
     nextStart = 0,
-    previousHit = -1;
+    previousHit = -1,
+    duelStaged = false;
   const available = new Map(),
     actions = [];
   while (state.phase !== "done") {
+    const finalists = state.players.filter((p) => p.health > 0);
+    if (!duelStaged && finalists.length === 2) {
+      duelStaged = true;
+      // A symmetric six-hit exchange adds anticipation without consuming random
+      // draws, changing health, or replacing the already established combat rules.
+      nextStart = Math.max(nextStart, 0, ...actions.map((a) => a.end)) + 180;
+      for (let i = 0; i < DUEL_EXCHANGES; i++) {
+        const attacker = finalists[(state.turn + i) % 2];
+        const target = finalists[(state.turn + i + 1) % 2];
+        const timing = {
+          windup: 180,
+          dash: 150,
+          impact: 130,
+          recover: 170,
+          gap: 420,
+        };
+        const start = nextStart,
+          hit = start + timing.windup + timing.dash;
+        const end = hit + timing.impact + timing.recover;
+        const hitEffect = {
+          attackerId: attacker.id,
+          targetId: target.id,
+          turn: state.turn,
+          damage: 0,
+          critical: false,
+          dodged: false,
+          fallen: false,
+          parried: true,
+        };
+        actions.push({
+          ...hitEffect,
+          id: actions.length,
+          visualOnly: true,
+          start,
+          hit,
+          end,
+          timing,
+          result: state,
+          hitEffect,
+        });
+        available.set(attacker.id, hit + timing.impact);
+        previousHit = hit;
+        nextStart = start + timing.gap;
+      }
+      nextStart = Math.max(...actions.map((a) => a.end)) + 180;
+    }
     const attack = planAttack(state, random);
     const timing = attackTiming(state);
     const start = Math.max(nextStart, available.get(attack.attackerId) ?? 0);
     const hit = Math.max(start + timing.windup + timing.dash, previousHit + 1);
     const result = resolveAttack(state, attack, random);
     const end = hit + timing.impact + timing.recover;
-    actions.push({ ...attack, start, hit, end, timing, result });
+    actions.push({
+      ...attack,
+      id: actions.length,
+      visualOnly: false,
+      start,
+      hit,
+      end,
+      timing,
+      result,
+      hitEffect: result.lastHit,
+    });
     available.set(attack.attackerId, hit + timing.impact);
     nextStart = start + timing.gap;
     previousHit = hit;
@@ -166,29 +227,53 @@ export function attackFrame(action, elapsed, reducedMotion = false) {
   };
 }
 
-export function arenaSlots(players, width, height) {
+export function fingerAnchor(player, width, height) {
+  const mx = Math.min(FINGER_MARGIN, width / 2),
+    my = Math.min(FINGER_MARGIN, height / 2);
+  return {
+    x: Math.max(mx, Math.min(player.x, width - mx)),
+    y: Math.max(my, Math.min(player.y, height - my)),
+  };
+}
+
+export function arenaSlots(
+  players,
+  width,
+  height,
+  { minimumAdvance = 120, inwardRatio = 0.42 } = {},
+) {
   const clamp = (value, low, high) => Math.max(low, Math.min(value, high));
   const cx = width / 2,
     cy = height / 2;
   const slots = players.map((player) => {
-    const x = clamp(
-      player.originX == null ? player.x : player.originX * width,
-      73,
-      width - 73,
-    );
-    const y = clamp(
-      player.originY == null ? player.y : player.originY * height,
-      73,
-      height - 73,
+    const { x, y } = fingerAnchor(
+      {
+        x: player.originX == null ? player.x : player.originX * width,
+        y: player.originY == null ? player.y : player.originY * height,
+      },
+      width,
+      height,
     );
     const dx = cx - x,
       dy = cy - y,
       distance = Math.hypot(dx, dy);
-    const inward = Math.min(distance, Math.max(72, distance * 0.32));
+    const inward = Math.min(
+      distance,
+      Math.max(minimumAdvance, distance * inwardRatio),
+    );
+    const fallback = player.id * 2.4;
     return {
       id: player.id,
-      x: x + (dx / (distance || 1)) * inward,
-      y: y + (dy / (distance || 1)) * inward,
+      x:
+        x +
+        (distance < 1
+          ? Math.cos(fallback) * minimumAdvance
+          : (dx / distance) * inward),
+      y:
+        y +
+        (distance < 1
+          ? Math.sin(fallback) * minimumAdvance
+          : (dy / distance) * inward),
     };
   });
   // Separate close touches without replacing their original side of the table.

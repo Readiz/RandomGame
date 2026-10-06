@@ -6,6 +6,8 @@
   export let progress = 0;
   export let critical = false;
   export let dodged = false;
+  export let parried = false;
+  export let clipId;
   export let reducedMotion = false;
   export let attackerId;
   export let turn;
@@ -15,7 +17,7 @@
   $: px = -dy / length;
   $: py = dx / length;
   $: charging = stage === "windup";
-  $: hit = (stage === "impact" || stage === "recover") && !dodged;
+  $: hit = (stage === "impact" || stage === "recover") && !dodged && !parried;
   $: fade = stage === "recover" ? 1 - progress : 1;
   $: travel =
     stage === "dash"
@@ -41,9 +43,11 @@
   data-attack-effect={heroId}
   data-attacker-id={attackerId}
   data-attack-turn={turn}
+  data-attack-id={clipId}
   data-stage={stage}
   data-progress={progress}
   data-dodged={dodged}
+  data-parried={parried}
   data-origin-x={from.x}
   data-origin-y={from.y}
   fill="none"
@@ -251,6 +255,29 @@
           stroke-width="1.5"
         />
       </g>
+    </g>
+  {/if}
+  {#if parried && (stage === "impact" || stage === "recover")}
+    <g transform={`translate(${to.x} ${to.y})`} opacity={fade} data-cue="parry">
+      <circle
+        r={25 + progress * 5}
+        fill="#bdefff"
+        fill-opacity=".12"
+        stroke="#cff7ff"
+        stroke-width="2.5"
+      />
+      <path
+        d="M-18 -18A26 26 0 0 1 18 18M-22 12A26 26 0 0 1 -22 -12"
+        stroke="#78dfff"
+        stroke-width="4"
+      />
+      {#each spokes.slice(0, 6) as angle}
+        <path
+          d={`M${Math.cos(angle) * 32} ${Math.sin(angle) * 32}l${Math.cos(angle) * 7} ${Math.sin(angle) * 7}`}
+          stroke="#eaffff"
+          stroke-width="2"
+        />
+      {/each}
     </g>
   {/if}
   {#if hit && stage === "impact" && heroId !== "giant"}

@@ -10,6 +10,9 @@
     MAX_PLAYERS,
     MAX_HEALTH,
     MARCH_MS,
+    FINGER_RING_SIZE,
+    FINGER_ORBIT_RADIUS,
+    fingerAnchor,
     createBattleTimeline,
     attackFrame,
     arenaSlots,
@@ -70,16 +73,14 @@
             ? `${participants.length}명 참여. ${countdown}초 뒤 시작.`
             : participants.length
               ? "한 명 더 손가락을 올려주세요."
-              : "손가락을 올려요. 마지막 생존자가 커피를 삽니다.";
+              : `손가락을 올려요. 최대 ${MAX_PLAYERS}명. 마지막 생존자가 커피를 삽니다.`;
   $: if (phase === "result" && resultButton)
     resultButton.focus({ preventScroll: true });
 
   const clamp = (value, min, max) => Math.max(min, Math.min(value, max));
-  const anchorPoint = (p, areaWidth = width, areaHeight = height) => ({
-    x: clamp(p.x, 73, areaWidth - 73),
-    y: clamp(p.y, 73, areaHeight - 73),
-  });
-  // The sprite's head points up at zero degrees. Its center sits under the touch.
+  const anchorPoint = (p, areaWidth = width, areaHeight = height) =>
+    fingerAnchor(p, areaWidth, areaHeight);
+  // The sprite's head points up at zero degrees, toward the screen center.
   const heading = (
     from,
     areaWidth = width,
@@ -96,8 +97,8 @@
       ((elapsed / 6000 + participant.colorIndex / 10) % 1) * Math.PI * 2;
     const numbers = [0, 1, 2].map((index) => {
       const angle = orbit + (index * Math.PI * 2) / 3;
-      const x = Math.sin(angle) * 56;
-      const y = -Math.cos(angle) * 56;
+      const x = Math.sin(angle) * FINGER_ORBIT_RADIUS;
+      const y = -Math.cos(angle) * FINGER_ORBIT_RADIUS;
       return {
         x,
         y,
@@ -123,9 +124,9 @@
       uy = dy / (distance || 1);
     return {
       ...actor,
-      visible: distance > 66,
-      x1: anchor.x + ux * 44,
-      y1: anchor.y + uy * 44,
+      visible: distance > FINGER_RING_SIZE / 2 + 24,
+      x1: anchor.x + ux * (FINGER_RING_SIZE / 2 + 2),
+      y1: anchor.y + uy * (FINGER_RING_SIZE / 2 + 2),
       x2: actor.x - ux * 22,
       y2: actor.y - uy * 22,
     };
@@ -219,12 +220,16 @@
   }
 
   function syncLobby() {
+    const slots = arenaSlots(participants, width, height, {
+      minimumAdvance: 96,
+      inwardRatio: 0,
+    });
     actors = participants.map((p) => ({
       ...p,
-      ...anchorPoint(p),
+      ...slots.find((s) => s.id === p.id),
       health: MAX_HEALTH,
       pose: "idle",
-      angle: heading(anchorPoint(p)),
+      angle: heading(slots.find((s) => s.id === p.id)),
     }));
   }
 
@@ -285,8 +290,9 @@
       to,
       rig,
       heroId: striker.heroId,
-      critical: landed && clip.result.lastHit.critical,
-      dodged: landed && clip.result.lastHit.dodged,
+      critical: landed && clip.hitEffect.critical,
+      dodged: landed && clip.hitEffect.dodged,
+      parried: landed && clip.hitEffect.parried,
     };
   }
 
@@ -305,7 +311,7 @@
       const action = timeline.actions[resolvedHits++];
       const striker = actors.find((p) => p.id === action.attackerId);
       const target = actors.find((p) => p.id === action.targetId);
-      if (!action.result.lastHit.dodged)
+      if (!action.hitEffect.dodged)
         action.aim = { x: target.x / width, y: target.y / height };
       const origin = attackRig(
         striker,
@@ -314,6 +320,10 @@
         "impact",
       );
       action.origin = { x: origin.x / width, y: origin.y / height };
+      if (action.visualOnly) {
+        vibrate(14);
+        continue;
+      }
       battle = action.result;
       if (!battle.lastHit.dodged)
         vibrate(
@@ -462,7 +472,12 @@
           };
         }
         if (phase === "result") {
-          goal = anchorPoint(participants.find((p) => p.id === actor.id));
+          goal = arenaSlots(
+            [participants.find((p) => p.id === actor.id)],
+            width,
+            height,
+            { minimumAdvance: 104, inwardRatio: 0 },
+          )[0];
           pose =
             Math.hypot(goal.x - actor.x, goal.y - actor.y) > 4 ? "walk" : "win";
         } else {
@@ -507,12 +522,13 @@
               distance = Math.hypot(dx, dy) || 1;
             const ux = dx / distance,
               uy = dy / distance;
-            const dodged = incoming.result.lastHit.dodged;
+            const dodged = incoming.hitEffect.dodged;
+            const parried = incoming.hitEffect.parried;
             goal = {
-              x: goal.x + (dodged ? -uy * 24 : ux * 13),
-              y: goal.y + (dodged ? ux * 24 : uy * 13),
+              x: goal.x + (dodged ? -uy * 24 : ux * (parried ? 5 : 13)),
+              y: goal.y + (dodged ? ux * 24 : uy * (parried ? 5 : 13)),
             };
-            if (!action) pose = dodged ? "walk" : "hurt";
+            if (!action) pose = dodged ? "walk" : parried ? "guard" : "hurt";
           }
           goal = {
             x: clamp(goal.x, 36, width - 36),
@@ -595,7 +611,7 @@
   data-beat={beat}
   data-turn={battle?.turn ?? 0}
   data-active-attacks={clips.length}
-  style={`--winner-color:${winner ? COLORS[winner.colorIndex].hex : "#101114"};--result-size:${resultSize}px`}
+  style={`--winner-color:${winner ? COLORS[winner.colorIndex].hex : "#101114"};--result-size:${resultSize}px;--finger-size:${FINGER_RING_SIZE}px`}
 >
   {#if phase === "result"}
     <div
@@ -624,6 +640,7 @@
       <div class="invitation" aria-hidden="true">
         <p>손가락을 올려요</p>
         <span>마지막까지 살아남으면 커피 ☕</span>
+        <small>최대 {MAX_PLAYERS}명 · 2명부터 시작</small>
       </div>
     {:else if phase === "lobby"}
       <div class="invitation waiting" aria-hidden="true"><p>한 명 더</p></div>
@@ -746,8 +763,10 @@
           attackProgress={actor.attackProgress}
           armAngle={actor.armAngle}
         />
-        {#each clips.filter((c) => c.targetId === actor.id && c.stage === "impact" && c.result.lastHit.dodged) as dodge (dodge.turn)}
-          <span class="hit-word">회피</span>
+        {#each clips.filter((c) => c.targetId === actor.id && c.stage === "impact" && (c.hitEffect.dodged || c.hitEffect.parried)) as defense (defense.id)}
+          <span class="hit-word"
+            >{defense.hitEffect.parried ? "막기" : "회피"}</span
+          >
         {/each}
       </div>
     {/each}
@@ -757,10 +776,11 @@
         viewBox={`0 0 ${width} ${height}`}
         aria-hidden="true"
       >
-        {#each effects as effect (effect.turn)}
+        {#each effects as effect (effect.id)}
           <AttackEffect
             attackerId={effect.attackerId}
             turn={effect.turn}
+            clipId={effect.id}
             from={effect.from}
             to={effect.to}
             heroId={effect.heroId}
@@ -769,6 +789,7 @@
             {reducedMotion}
             critical={effect.critical}
             dodged={effect.dodged}
+            parried={effect.parried}
           />
         {/each}
       </svg>

@@ -348,6 +348,13 @@
     animation: hit 0.18s ease-out;
     filter: brightness(1.5);
   }
+  .guard .body {
+    transform: translate(0, 2px) scaleY(0.94);
+    filter: brightness(1.2);
+  }
+  .guard .weapon {
+    transform: rotate(-65deg);
+  }
   .down .body {
     transform: translate(4px, 7px) rotate(85deg);
     opacity: 0.22;

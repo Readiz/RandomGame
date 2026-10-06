@@ -27,6 +27,7 @@ import java.util.Collections;
 public final class MainActivity extends Activity {
     private WebView webView;
     private GameHaptics haptics;
+    private AndroidUpdates updates;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override public void onCreate(Bundle state) {
@@ -71,6 +72,9 @@ public final class MainActivity extends Activity {
         WebViewAssetLoader loader = new WebViewAssetLoader.Builder()
                 .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this)).build();
         webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView view, String url) {
+                if (updates != null) updates.onPageFinished();
+            }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return !AssetPolicy.HOME.equals(request.getUrl().toString());
             }
@@ -85,6 +89,7 @@ public final class MainActivity extends Activity {
                 return new WebResourceResponse("text/plain", "UTF-8", 403, "Blocked", Collections.emptyMap(), new ByteArrayInputStream(new byte[0]));
             }
         });
+        updates = new AndroidUpdates(this, webView);
         webView.loadUrl(AssetPolicy.HOME);
     }
 
@@ -107,8 +112,10 @@ public final class MainActivity extends Activity {
             reportVisibility(false);
             haptics.setActive(true);
         }
+        if (updates != null) updates.onResume();
     }
     @Override protected void onPause() {
+        if (updates != null) updates.onPause();
         if (webView != null) {
             haptics.setActive(false);
             reportVisibility(true);
@@ -117,6 +124,7 @@ public final class MainActivity extends Activity {
         super.onPause();
     }
     @Override protected void onDestroy() {
+        if (updates != null) updates.close();
         if (haptics != null) haptics.setActive(false);
         if (webView != null) {
             ((FrameLayout) webView.getParent()).removeView(webView);

@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import Fighter from "./Fighter.svelte";
   import AttackEffect from "./AttackEffect.svelte";
+  import { attackRig } from "./attack-presentation.js";
   import {
     COLORS,
     HEROES,
@@ -35,6 +36,9 @@
     remaining = 0;
   let motionStarted = 0,
     pauseStarted = 0;
+  let beatStarted = 0,
+    beatProgress = 0,
+    attackAim = null;
   let raf,
     lastFrame = 0,
     orbitTime = 0;
@@ -46,6 +50,11 @@
   $: rendered = [...actors].sort((a, b) => a.y - b.y);
   $: striker = actors.find((p) => p.id === attack?.attackerId);
   $: victim = actors.find((p) => p.id === attack?.targetId);
+  $: aim =
+    attackAim && beat !== "windup"
+      ? { x: attackAim.x * width, y: attackAim.y * height }
+      : victim;
+  $: rig = striker && aim ? attackRig(striker, aim, width, beat) : null;
   $: announcement =
     phase === "result"
       ? `${winner.id}번 ${COLORS[winner.colorIndex].name}, 마지막 생존자. 오늘 커피 당첨!`
@@ -170,6 +179,7 @@
     actors = [];
     battle = null;
     attack = null;
+    attackAim = null;
     phase = "lobby";
     beat = "idle";
     countdown = 3;
@@ -219,12 +229,15 @@
   function startAttack() {
     attack = planAttack(battle);
     timing = attackTiming(battle);
-    beat = "windup";
+    attackAim = null;
+    setBeat("windup");
     schedule(() => {
-      beat = "dash";
+      const target = actors.find((p) => p.id === attack.targetId);
+      attackAim = { x: target.x / width, y: target.y / height };
+      setBeat("dash");
       schedule(() => {
         battle = resolveAttack(battle, attack);
-        beat = "impact";
+        setBeat("impact");
         if (!battle.lastHit.dodged)
           vibrate(
             battle.lastHit.fallen
@@ -234,7 +247,7 @@
                 : 28,
           );
         schedule(() => {
-          beat = "recover";
+          setBeat("recover");
           if (battle.phase === "done") {
             schedule(() => {
               phase = "result";
@@ -245,6 +258,12 @@
         }, timing.impact);
       }, timing.dash);
     }, timing.windup);
+  }
+
+  function setBeat(value) {
+    beat = value;
+    beatStarted = performance.now();
+    beatProgress = 0;
   }
 
   function addParticipant(x, y, pointerId = null) {
@@ -336,6 +355,10 @@
     lastFrame = now;
     if (!paused && !reducedMotion && participants.length) orbitTime += dt;
     if (!paused && battle) {
+      if (phase === "fight" && timing)
+        beatProgress = reducedMotion
+          ? 1
+          : clamp((now - beatStarted) / timing[beat], 0, 1);
       const living = battle.players.filter((p) => p.health > 0);
       // Keep a just-defeated target's slot until the current impact finishes.
       const field =
@@ -396,6 +419,8 @@
               x: targetHome.x - ux * reach,
               y: targetHome.y - uy * reach,
             };
+          } else if (beat === "recover") {
+            pose = "recover";
           }
         } else if (actor.id === attack?.targetId && attackerHome) {
           if (beat === "impact") {
@@ -446,6 +471,7 @@
         clearTimeout(timer);
         if (!battle) reset();
       } else {
+        beatStarted += performance.now() - pauseStarted;
         if (phase === "march")
           motionStarted += performance.now() - pauseStarted;
         lastFrame = performance.now();
@@ -543,14 +569,6 @@
             visibility={link.visible ? "visible" : "hidden"}
           />
         {/each}
-        {#if phase === "fight" && beat === "impact" && !battle.lastHit.dodged && striker && victim}
-          {#key battle.turn}<AttackEffect
-              from={striker}
-              to={victim}
-              heroId={striker.heroId}
-              critical={battle.lastHit.critical}
-            />{/key}
-        {/if}
       </svg>
     {/if}
 
@@ -606,6 +624,11 @@
           pose={actor.pose}
           number={actor.id}
           heroId={actor.heroId}
+          attackStage={phase === "fight" && actor.id === attack?.attackerId
+            ? beat
+            : "idle"}
+          attackProgress={beatProgress}
+          armAngle={actor.id === attack?.attackerId ? (rig?.armAngle ?? 0) : 0}
         />
         {#if phase === "fight" && beat === "impact" && battle.lastHit.targetId === actor.id}
           {#key battle.turn}
@@ -615,6 +638,26 @@
         {/if}
       </div>
     {/each}
+    {#if phase === "fight" && striker && aim && rig}
+      <svg
+        class="combat-effects"
+        viewBox={`0 0 ${width} ${height}`}
+        aria-hidden="true"
+      >
+        <AttackEffect
+          from={rig}
+          to={aim}
+          heroId={striker.heroId}
+          stage={beat}
+          progress={beatProgress}
+          {reducedMotion}
+          critical={(beat === "impact" || beat === "recover") &&
+            battle.lastHit?.critical}
+          dodged={(beat === "impact" || beat === "recover") &&
+            battle.lastHit?.dodged}
+        />
+      </svg>
+    {/if}
   </div>
   <p class="sr-only" aria-live="polite" aria-atomic="true">{announcement}</p>
   {#if phase === "result"}

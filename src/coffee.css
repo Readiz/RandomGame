@@ -140,7 +140,8 @@ button:focus-visible,
   color: #b6a19388;
   pointer-events: none;
 }
-.connections {
+.connections,
+.combat-effects {
   position: absolute;
   inset: 0;
   width: 100%;

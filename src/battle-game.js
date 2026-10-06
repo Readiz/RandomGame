@@ -4,10 +4,10 @@ export const MARCH_MS = 1450;
 // Archetypes change presentation and reach, never the combat draw or damage.
 export const HEROES = [
   { id: "suit", name: "파워슈트", reach: 68 },
-  { id: "shield", name: "방패 전사", reach: 27 },
+  { id: "shield", name: "방패 전사", reach: 80 },
   { id: "thunder", name: "번개 전사", reach: 62 },
   { id: "giant", name: "초록 거인", reach: 29 },
-  { id: "web", name: "거미 곡예사", reach: 42 },
+  { id: "web", name: "거미 곡예사", reach: 72 },
   { id: "mage", name: "마법사", reach: 82 },
 ];
 
@@ -103,9 +103,9 @@ export function resolveAttack(battle, attack, random = randomUnit) {
 
 export function attackTiming(battle) {
   const alive = battle.players.filter((p) => p.health > 0).length;
-  if (alive === 2) return { windup: 480, dash: 130, impact: 170, recover: 200 };
-  if (alive <= 4) return { windup: 190, dash: 110, impact: 110, recover: 130 };
-  return { windup: 100, dash: 95, impact: 85, recover: 90 };
+  if (alive === 2) return { windup: 480, dash: 200, impact: 230, recover: 200 };
+  if (alive <= 4) return { windup: 210, dash: 180, impact: 190, recover: 130 };
+  return { windup: 140, dash: 160, impact: 160, recover: 110 };
 }
 
 export function arenaSlots(players, width, height) {

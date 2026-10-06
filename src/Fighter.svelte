@@ -3,6 +3,11 @@
   export let pose = "idle";
   export let number = 1;
   export let heroId = "suit";
+  export let attackStage = "idle";
+  export let attackProgress = 0;
+  export let armAngle = 0;
+  $: casting = attackStage !== "idle";
+  $: aimed = casting && ["suit", "web", "mage"].includes(heroId);
   const suits = {
     suit: { body: "#b84446", trim: "#efcb78", legs: "#b84446" },
     shield: { body: "#4875ad", trim: "#e6edf2", legs: "#304e77" },
@@ -16,6 +21,8 @@
 
 <svg
   class={`hero ${heroId} ${pose}`}
+  class:casting
+  data-attack-stage={attackStage}
   viewBox="0 0 44 52"
   fill="none"
   aria-hidden="true"
@@ -30,6 +37,13 @@
     opacity=".5"
   />
   <g class="body">
+    {#if heroId === "suit" && casting}
+      <path
+        class="thrusters"
+        d="M12 46 15 57 18 46M26 46 29 57 32 46"
+        fill="#84eaff"
+      />
+    {/if}
     {#if heroId === "thunder" || heroId === "mage"}
       <path
         class="cape"
@@ -149,15 +163,24 @@
       <path d="M11 20 17 27 9 25ZM33 20 27 27 36 25Z" fill="#c95b69" />
     {/if}
 
-    <g class="weapon">
+    <g class="weapon" style={aimed ? `transform:rotate(${armAngle}deg)` : ""}>
       <path
-        d="M31 24 35 29"
+        d={["suit", "web", "mage"].includes(heroId)
+          ? "M31 25H43"
+          : "M31 24 35 29"}
         stroke={suit.body}
         stroke-width={heroId === "giant" ? 9 : 6}
         stroke-linecap="round"
       />
       {#if heroId === "suit"}
-        <circle class="charge" cx="37" cy="27" r="4" fill="#b7f7ff" />
+        <circle cx="43" cy="25" r="4.5" fill={suit.trim} />
+        <circle
+          class="charge"
+          cx="43"
+          cy="25"
+          r={casting ? 3.5 : 2}
+          fill="#dcfcff"
+        />
       {:else if heroId === "thunder"}
         <path d="M36 14 35 32" stroke="#b89569" stroke-width="3" />
         <path
@@ -179,7 +202,7 @@
         />
       {:else if heroId === "web"}
         <path
-          d="M35 28 40 20M35 27 33 21"
+          d="M40 25 47 22M40 25 47 28M40 25H44"
           stroke={suit.body}
           stroke-width="2.5"
           stroke-linecap="round"
@@ -187,21 +210,27 @@
       {:else if heroId === "mage"}
         <circle
           class="charge"
-          cx="37"
+          cx="43"
           cy="25"
           r="6"
           stroke="#ffc37b"
           stroke-width="1.5"
         />
         <path
-          d="M37 19 42 28H32ZM37 31 32 22H42Z"
+          d="M43 19 48 28H38ZM43 31 38 22H48Z"
           stroke="#ee9956"
           stroke-width=".8"
         />
       {/if}
     </g>
     {#if heroId === "shield"}
-      <g class="shield"
+      <g
+        class="shield"
+        style:opacity={attackStage === "dash" ||
+        attackStage === "impact" ||
+        (attackStage === "recover" && attackProgress < 0.9)
+          ? 0
+          : 1}
         ><circle cx="10" cy="31" r="10" fill="#be5361" /><circle
           cx="10"
           cy="31"
@@ -258,6 +287,11 @@
   .weapon {
     transform-origin: 31px 25px;
   }
+  .suit .weapon,
+  .web .weapon,
+  .mage .weapon {
+    transform: rotate(45deg);
+  }
   .walk .body {
     animation: bob 0.2s infinite alternate;
   }
@@ -276,22 +310,39 @@
   .swing .weapon {
     transform: rotate(55deg);
   }
-  .suit.swing .weapon,
-  .mage.swing .weapon,
-  .web.swing .weapon {
-    transform: translate(3px, -3px);
+  .thunder.windup .weapon {
+    transform: rotate(-100deg);
   }
-  .shield.swing .shield {
-    transform: translate(1px, -4px);
+  .thunder.recover .weapon {
+    transform: rotate(55deg);
+  }
+  .shield.windup .shield {
+    transform: translate(-3px, -5px);
+  }
+  .shield.swing .weapon {
+    transform: rotate(-75deg);
   }
   .giant.windup .body {
-    scale: 1.06;
+    transform: translate(0, -3px) scale(1.08, 1.12);
+  }
+  .giant.windup .weapon {
+    transform: rotate(-140deg);
   }
   .giant.swing .body {
-    translate: 0 2px;
+    transform: translate(0, 4px) scale(1.12, 0.9);
   }
-  .web.swing .body {
-    translate: 0 -5px;
+  .web.casting .left-leg {
+    transform: rotate(35deg);
+  }
+  .web.casting .right-leg {
+    transform: rotate(-25deg);
+  }
+  .mage.casting .cape {
+    transform: scaleX(1.15);
+    transform-origin: 22px 25px;
+  }
+  .thrusters {
+    filter: drop-shadow(0 0 3px #62d6ff);
   }
   .hurt .body {
     animation: hit 0.18s ease-out;

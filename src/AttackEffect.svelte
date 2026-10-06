@@ -2,112 +2,269 @@
   export let from;
   export let to;
   export let heroId;
+  export let stage;
+  export let progress = 0;
   export let critical = false;
+  export let dodged = false;
+  export let reducedMotion = false;
   $: dx = to.x - from.x;
   $: dy = to.y - from.y;
   $: length = Math.hypot(dx, dy) || 1;
   $: px = -dy / length;
   $: py = dx / length;
-  $: bolt = `M${from.x} ${from.y} L${from.x + dx * 0.35 + px * 9} ${from.y + dy * 0.35 + py * 9} L${from.x + dx * 0.6 - px * 8} ${from.y + dy * 0.6 - py * 8} L${to.x} ${to.y}`;
+  $: charging = stage === "windup";
+  $: hit = (stage === "impact" || stage === "recover") && !dodged;
+  $: fade = stage === "recover" ? 1 - progress : 1;
+  $: travel =
+    stage === "dash"
+      ? progress
+      : stage === "recover" && heroId === "shield"
+        ? 1 - progress
+        : 1;
+  $: tip = { x: from.x + dx * travel, y: from.y + dy * travel };
+  $: bend = Math.min(length * 0.2, 28);
+  $: disc = {
+    x: tip.x + px * 4 * bend * travel * (1 - travel),
+    y: tip.y + py * 4 * bend * travel * (1 - travel),
+  };
+  $: bolt = `M${from.x} ${from.y}L${from.x + dx * travel * 0.32 + px * 11 * travel} ${from.y + dy * travel * 0.32 + py * 11 * travel}L${from.x + dx * travel * 0.62 - px * 9 * travel} ${from.y + dy * travel * 0.62 - py * 9 * travel}L${tip.x} ${tip.y}`;
+  $: spin = reducedMotion ? 0 : progress * (stage === "recover" ? -540 : 540);
+  $: shock = 12 + progress * 22;
+  const spokes = Array.from({ length: 8 }, (_, i) => (i * Math.PI) / 4);
 </script>
 
 <g
   class="attack-effect"
   class:critical
   data-attack-effect={heroId}
+  data-stage={stage}
+  data-progress={progress}
+  data-dodged={dodged}
+  data-origin-x={from.x}
+  data-origin-y={from.y}
   fill="none"
   stroke-linecap="round"
 >
-  {#if heroId === "suit"}
+  {#if charging}
+    <g transform={`translate(${from.x} ${from.y})`} data-cue="charge">
+      {#if heroId === "suit"}
+        <circle
+          r={5 + progress * 8}
+          stroke="#82e7ff"
+          stroke-width="2"
+          opacity=".7"
+        />
+        <circle r={3 + progress * 3} fill="#eaffff" />
+        <path
+          d="M-18 0H-12M12 0H18M0 -18V-12M0 12V18"
+          stroke="#a8f7ff"
+          stroke-width="2"
+        />
+      {:else if heroId === "shield"}
+        <path d="M-15 8A17 17 0 0 1 11 -13" stroke="#b3d6ff" stroke-width="3" />
+      {:else if heroId === "thunder"}
+        <path
+          d="M-17 -10 -8 -3 -12 4 -2 10M9 -17 3 -9 11 -4 5 4M17 6 10 9 14 16"
+          stroke="#b4e1ff"
+          stroke-width="2"
+        />
+        <circle r={4 + progress * 5} fill="#ceeeff" opacity=".55" />
+      {:else if heroId === "giant"}
+        <path
+          d="M-22 8 -27 -2M-16 -8 -18 -18M5 -15 8 -24"
+          stroke="#bbdc92"
+          stroke-width="3"
+        />
+      {:else if heroId === "web"}
+        <path
+          d="M-8 0H8M0 -8V8M-5 -5 5 5M-5 5 5 -5"
+          stroke="#f7faff"
+          stroke-width="1.5"
+        />
+      {:else if heroId === "mage"}
+        <g transform={`rotate(${spin})`}>
+          <circle r={10 + progress * 7} stroke="#ffc477" stroke-width="2" />
+          <path
+            d="M0 -15 13 8H-13ZM0 15 -13 -8H13Z"
+            stroke="#ffce8c"
+            stroke-width="1.4"
+          />
+        </g>
+      {/if}
+    </g>
+  {:else if heroId === "suit"}
+    <g opacity={fade} data-cue="beam">
+      <path
+        d={`M${from.x} ${from.y}L${tip.x} ${tip.y}`}
+        stroke="#54cfff"
+        stroke-width={critical ? 17 : 12}
+        opacity=".3"
+      />
+      <path
+        d={`M${from.x} ${from.y}L${tip.x} ${tip.y}`}
+        stroke="#84eaff"
+        stroke-width={critical ? 8 : 6}
+      />
+      <path
+        d={`M${from.x} ${from.y}L${tip.x} ${tip.y}`}
+        stroke="#f3ffff"
+        stroke-width="2.5"
+      />
+      <circle cx={from.x} cy={from.y} r="7" fill="#d9ffff" />
+      {#if hit}<circle
+          cx={to.x}
+          cy={to.y}
+          r={shock}
+          stroke="#a8f5ff"
+          stroke-width="2"
+          opacity={1 - progress * 0.6}
+        />{/if}
+    </g>
+  {:else if heroId === "shield"}
     <path
-      d={`M${from.x} ${from.y}L${to.x} ${to.y}`}
-      stroke="#79dbe8"
-      stroke-width="5"
-      opacity=".55"
-    />
-    <path
-      d={`M${from.x} ${from.y}L${to.x} ${to.y}`}
-      stroke="#effffe"
-      stroke-width="1.8"
-    />
-    <circle cx={to.x} cy={to.y} r="18" stroke="#abf6f8" stroke-width="2" />
-  {:else if heroId === "thunder"}
-    <path d={bolt} stroke="#99c9ff" stroke-width="6" opacity=".35" />
-    <path d={bolt} stroke="#e7f6ff" stroke-width="2.5" />
-  {:else if heroId === "giant"}
-    <ellipse
-      cx={to.x}
-      cy={to.y + 10}
-      rx="31"
-      ry="16"
-      stroke="#d5eaaa"
+      d={`M${from.x} ${from.y}Q${from.x + dx * 0.5 + px * bend * 2} ${from.y + dy * 0.5 + py * bend * 2} ${to.x} ${to.y}`}
+      stroke="#a2c8ff"
       stroke-width="3"
-    />
-    <path
-      d={`M${to.x - 29} ${to.y - 16}l-6 -7M${to.x + 28} ${to.y - 16}l6 -7M${to.x} ${to.y + 26}v7`}
-      stroke="#e9edc5"
-      stroke-width="2"
-    />
-  {:else if heroId === "web"}
-    {#each [-1, 0, 1] as offset}<path
-        d={`M${from.x} ${from.y}L${to.x + px * offset * 15} ${to.y + py * offset * 15}`}
-        stroke="#e4edf0"
-        stroke-width="1.1"
-      />{/each}
-    <circle cx={to.x} cy={to.y} r="20" stroke="#e4edf0" stroke-width="1.3" />
-    <path
-      d={`M${to.x - 20} ${to.y}h40M${to.x} ${to.y - 20}v40M${to.x - 14} ${to.y - 14}l28 28M${to.x + 14} ${to.y - 14}l-28 28`}
-      stroke="#e4edf0"
-      stroke-width=".9"
-    />
-  {:else if heroId === "mage"}
-    <path
-      d={`M${from.x} ${from.y}L${to.x} ${to.y}`}
-      stroke="#f1b56d"
       opacity=".4"
     />
-    <circle cx={to.x} cy={to.y} r="25" stroke="#ffc67c" stroke-width="2" />
-    <circle cx={to.x} cy={to.y} r="18" stroke="#dc8e61" stroke-width="1" />
-    <path
-      d={`M${to.x} ${to.y - 24}L${to.x + 21} ${to.y + 12}H${to.x - 21}ZM${to.x} ${to.y + 24}L${to.x - 21} ${to.y - 12}H${to.x + 21}Z`}
-      stroke="#f0b271"
-    />
-  {:else}
-    <circle
-      cx={to.x}
-      cy={to.y}
-      r="23"
-      stroke="#e9ddd2"
-      stroke-width="3"
-      stroke-dasharray="50 18"
-    />
-    <path
-      d={`M${to.x - 25} ${to.y + 18}Q${to.x + 24} ${to.y + 14} ${to.x + 25} ${to.y - 21}`}
-      stroke="#a2c4ec"
-      stroke-width="3"
-    />
+    <g
+      transform={`translate(${disc.x} ${disc.y}) rotate(${spin})`}
+      data-cue="shield-flight"
+    >
+      <circle r="14" fill="#c34d60" stroke="#e4a0ac" stroke-width="1" />
+      <circle r="10" fill="#eff5f1" /><circle r="6.5" fill="#497eae" />
+      <path d="m0 -6 2 4 4 1 -4 2 -2 5 -2 -5 -4 -2 4 -1Z" fill="#effaff" />
+    </g>
+  {:else if heroId === "thunder"}
+    <g opacity={fade} data-cue="lightning">
+      <path d={bolt} stroke="#6caaff" stroke-width="9" opacity=".4" />
+      <path d={bolt} stroke="#e5faff" stroke-width="3" />
+      {#if hit}
+        <path
+          d={`M${to.x - 9} ${to.y - 92}l-14 36 24 -5 -15 33 14 -4L${to.x} ${to.y}`}
+          stroke="#85bcff"
+          stroke-width="11"
+          opacity=".35"
+        />
+        <path
+          d={`M${to.x - 9} ${to.y - 92}l-14 36 24 -5 -15 33 14 -4L${to.x} ${to.y}`}
+          stroke="#e4faff"
+          stroke-width="3.5"
+        />
+        <path
+          d={`M${to.x - 5} ${to.y - 28}l26 -18 -8 -12`}
+          stroke="#a0d5ff"
+          stroke-width="2"
+        />
+      {/if}
+    </g>
+  {:else if heroId === "giant"}
+    {#if stage === "dash"}
+      <path
+        d={`M${from.x - px * 17} ${from.y - py * 17}l${-dx * 0.28} ${-dy * 0.28}M${from.x + px * 17} ${from.y + py * 17}l${-dx * 0.22} ${-dy * 0.22}`}
+        stroke="#bddb98"
+        stroke-width="3"
+      />
+    {/if}
+    {#if hit}
+      <g
+        transform={`translate(${to.x} ${to.y})`}
+        opacity={fade}
+        data-cue="ground-smash"
+      >
+        <ellipse
+          rx={shock * 1.65}
+          ry={shock}
+          stroke="#d1eaa3"
+          stroke-width="3"
+        />
+        <ellipse
+          rx={shock * 1.15}
+          ry={shock * 0.65}
+          stroke="#adc48b"
+          stroke-width="1.5"
+        />
+        <path
+          d="M-8 -4 -25 -13 -32 -9 -43 -17M6 -4 24 -15 27 -9 42 -14M1 5 -2 15 7 20 3 29"
+          stroke="#aabb8a"
+          stroke-width="2"
+        />
+        {#each spokes as angle}
+          <path
+            d="m-2 -2 5 1 -1 4 -4 -1Z"
+            transform={`translate(${Math.cos(angle) * shock * 1.8} ${Math.sin(angle) * shock}) rotate(${(angle * 180) / Math.PI})`}
+            fill="#b8cc93"
+          />
+        {/each}
+      </g>
+    {/if}
+  {:else if heroId === "web"}
+    <g opacity={fade} data-cue="web-shot">
+      {#each [-1, 0, 1] as offset}
+        <path
+          d={`M${from.x} ${from.y}L${tip.x + px * offset * 9 * travel} ${tip.y + py * offset * 9 * travel}`}
+          stroke="#eff8ff"
+          stroke-width={offset === 0 ? 2 : 1}
+        />
+      {/each}
+      {#if hit}
+        <g transform={`translate(${to.x} ${to.y})`}>
+          <circle r="26" stroke="#eef9ff" stroke-width="1.5" /><circle
+            r="15"
+            stroke="#eef9ff"
+          />
+          {#each spokes as angle}<path
+              d={`M0 0L${Math.cos(angle) * 29} ${Math.sin(angle) * 29}`}
+              stroke="#eef9ff"
+              stroke-width="1.2"
+            />{/each}
+        </g>
+      {/if}
+    </g>
+  {:else if heroId === "mage"}
+    <g opacity={fade} data-cue="spell">
+      <circle
+        cx={from.x}
+        cy={from.y}
+        r="16"
+        stroke="#ffc57f"
+        stroke-width="2"
+      />
+      <path
+        d={`M${from.x} ${from.y}L${tip.x} ${tip.y}`}
+        stroke="#e8a35c"
+        stroke-width="6"
+        opacity=".35"
+      />
+      <g
+        transform={`translate(${hit ? to.x : tip.x} ${hit ? to.y : tip.y}) rotate(${spin})`}
+      >
+        <circle r={hit ? 30 : 11} stroke="#ffc67c" stroke-width="2.5" />
+        <circle r={hit ? 23 : 7} stroke="#df9154" stroke-width="1.5" />
+        <path
+          d="M0 -23 20 12H-20ZM0 23 -20 -12H20Z"
+          stroke="#ffd296"
+          stroke-width="1.5"
+        />
+      </g>
+    </g>
+  {/if}
+  {#if hit && stage === "impact" && heroId !== "giant"}
+    <g transform={`translate(${to.x} ${to.y})`} opacity={1 - progress * 0.8}>
+      {#each spokes.slice(0, 6) as angle}<path
+          d={`M${Math.cos(angle) * 26} ${Math.sin(angle) * 26}l${Math.cos(angle) * 8} ${Math.sin(angle) * 8}`}
+          stroke="#fff3d2"
+          stroke-width={critical ? 3 : 1.5}
+        />{/each}
+    </g>
   {/if}
 </g>
 
 <style>
   .attack-effect {
     pointer-events: none;
-    animation: impact 0.28s ease-out both;
   }
   .critical {
-    filter: drop-shadow(0 0 4px #fff0ba);
-  }
-  @keyframes impact {
-    from {
-      opacity: 1;
-    }
-    to {
-      opacity: 0;
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .attack-effect {
-      animation: none;
-    }
+    filter: drop-shadow(0 0 3px #fff0ba);
   }
 </style>

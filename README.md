@@ -2,7 +2,7 @@
 
 점심시간, 오늘 커피는 누가 살까요? 한 화면에 손가락을 올리면 작은 히어로들이 자동으로 모여 싸웁니다. **끝까지 살아남은 한 명이 오늘의 커피 당첨자!**
 
-**[웹에서 바로 플레이](https://blog.readiz.com/RandomGame/)** · **[Android APK 다운로드](https://github.com/Readiz/RandomGame/releases/latest/download/random-game.apk)** · [최신 릴리스](https://github.com/Readiz/RandomGame/releases/latest)
+**[웹에서 바로 플레이](https://git.readiz.com/RandomGame/)** · **[Android APK 다운로드](https://github.com/Readiz/RandomGame/releases/latest/download/random-game.apk)** · [최신 릴리스](https://github.com/Readiz/RandomGame/releases/latest)
 
 2~10명이 한 기기로 함께하는 짧은 커피내기 게임입니다. 메뉴 없이 손가락을 올리는 것만으로 시작합니다.
 
@@ -129,6 +129,6 @@ npm run release:pages
 
 ## 원래의 강화 게임
 
-기존 운빨망겜은 [클래식 버전](https://blog.readiz.com/RandomGame/classic.html)에서 계속 플레이할 수 있습니다. 커피 난투와 별도 진입점으로 유지합니다.
+기존 운빨망겜은 [클래식 버전](https://git.readiz.com/RandomGame/classic.html)에서 계속 플레이할 수 있습니다. 커피 난투와 별도 진입점으로 유지합니다.
 
 클래식 게임의 검 이미지는 기존 운빨망겜 자산을 재사용합니다. 원본 출처: https://www.gdunlimited.net/resources/cat/rpg-maker-xp/icons/2/comments/desc/96
